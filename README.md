@@ -61,31 +61,183 @@ All deployment configurations—including **Nginx reverse proxy**, **PM2 process
 
 ---
 
-## 2. Multi-Domain Routing: Subdomains vs Custom Domains
+## 2. Multi-Domain Routing & DNS Architecture
 
-Our routing engine dynamically accommodates two distinct domain onboarding models:
+Our multi-tenant platform supports **two distinct domain models** simultaneously without modifying application code or reloading servers:
 
-| Feature | Option A: Platform Subdomain | Option B: Independent Custom Domain |
+| Feature | Option A: Platform Managed Subdomain | Option B: Independent Custom Domain |
 | :--- | :--- | :--- |
-| **Domain Example** | `abc.prod.com` (or `abc.localhost`) | `clientbrand.com` or `notes.clientbrand.com` |
-| **Use Case** | Default automated provisioning for standard tenants | Enterprise clients who require their own branding |
-| **DNS Configuration** | Wildcard record: `*.prod.com -> VPS IP` | Client adds `CNAME` pointing to `prod.com` OR `A` record to VPS IP |
-| **Nginx Handling** | Handled automatically by wildcard server block | Caught by regex server block: `server_name ~^(?<tenant>.+)\.prod\.com$ yourdomain.com;` |
-| **Tenant Matching** | Normalized `Host` header matched in `custom_domains` | Normalized `Host` header matched in `custom_domains` |
-| **SSL / HTTPS** | Wildcard SSL certificate via Certbot | Certbot multi-domain certificate (`certbot -d clientbrand.com`) |
-
-### How DNS & Nginx Resolve Custom Domains:
-1. **Client DNS**: The client company points their domain `notes.acme.com` to your server using a DNS `CNAME` pointing to `prod.com` (or `A` record pointing to your VPS Public IP).
-2. **Nginx Capture**: Nginx listens on port 80/443. It receives the request and **preserves the client's original domain** using:
-   ```nginx
-   proxy_set_header Host $host;
-   ```
-3. **Django Resolution**: Django's [`TenantMiddleware`](file:///e:/note%20taker/backend/tenants/middleware.py) reads `request.get_host()`, queries `custom_domains` for `notes.acme.com`, and finds the assigned tenant.
-4. **Data Isolation**: Django attaches `request.tenant = Acme Corporation`. All API queries automatically filter by `tenant_id = Acme.id`.
+| **Domain Example** | `abc.yourdomain.com` (or `abc.localhost`) | `notes.clientbrand.com` or `clientbrand.com` |
+| **Target Audience** | Standard tenants, quick self-service onboarding | Enterprise clients requiring custom white-label branding |
+| **DNS Record Type** | Wildcard `A` or `CNAME` managed by SaaS owner | `CNAME` (recommended for subdomains) or `A` (for apex domains) managed by client |
+| **DNS Target** | `*.yourdomain.com &rarr; VPS_PUBLIC_IP` | `prod.yourdomain.com` (CNAME) or `VPS_PUBLIC_IP` (A Record) |
+| **Nginx Handling** | Wildcard server block catch-all | Regex server block preserving `$host` header |
+| **Tenant Middleware** | Queries `custom_domains` where `domain = 'abc.yourdomain.com'` | Queries `custom_domains` where `domain = 'notes.clientbrand.com'` |
+| **SSL / HTTPS** | Wildcard Let's Encrypt certificate (`*.yourdomain.com`) | Certbot domain expansion (`certbot --nginx -d notes.clientbrand.com`) |
 
 ---
 
-## 3. Database Multi-Tenancy Architecture Options
+## 3. Comprehensive DNS & Custom Domain Manual
+
+### 3.1 Understanding the Request Flow (DNS &rarr; Nginx &rarr; Django &rarr; UI)
+
+```
+[ User types: notes.clientbrand.com ]
+                |
+                v
+[ 1. Client DNS Lookup ]
+       Does notes.clientbrand.com have a CNAME to prod.yourdomain.com?
+       Resolves to: VPS Public IP (e.g., 203.0.113.10)
+                |
+                v
+[ 2. Nginx Reverse Proxy (Port 80/443) ]
+       Receives incoming HTTP/HTTPS TCP connection
+       CRITICAL: proxy_set_header Host $host; preserves "notes.clientbrand.com"
+       Forwards request to 127.0.0.1:8000 (Django / Gunicorn)
+                |
+                v
+[ 3. Django TenantMiddleware ]
+       Reads request.get_host() &rarr; "notes.clientbrand.com"
+       Normalizes host (lowercases, removes port)
+       SQL Query: SELECT * FROM custom_domains WHERE domain = 'notes.clientbrand.com'
+       Finds Tenant: "Acme Corp" (ID: 101, Status: ACTIVE)
+       Sets: request.tenant = Acme Corp
+                |
+                v
+[ 4. Database Query Isolation ]
+       API View executes: Note.objects.filter(tenant_id=request.tenant.id)
+       Tenant A can NEVER query or view Tenant B's records.
+                |
+                v
+[ 5. React Frontend Theming & Rendering ]
+       TenantContext loads organization name ("Acme Corp") & primary brand color.
+       Renders the tenant-branded workspace instantly.
+```
+
+---
+
+### 3.2 DNS Records Required
+
+#### For SaaS Platform Owners (Subdomain Wildcard)
+To enable instant, zero-touch tenant subdomains (`tenant1.yourdomain.com`, `tenant2.yourdomain.com`, etc.):
+
+| Record Type | Host / Name | Value / Points To | TTL | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **A** | `@` | `YOUR_VPS_PUBLIC_IP` | 3600 (Auto) | Directs apex domain (`yourdomain.com`) to VPS |
+| **A** | `prod` | `YOUR_VPS_PUBLIC_IP` | 3600 (Auto) | Platform landing page & admin portal (`prod.yourdomain.com`) |
+| **A** (or CNAME) | `*` | `YOUR_VPS_PUBLIC_IP` | 3600 (Auto) | Wildcard record routing **all tenant subdomains** to VPS |
+
+#### For Tenant Customers (Custom Domains)
+When an enterprise customer wants to use their own branded domain (e.g., `notes.clientcompany.com` or `clientcompany.com`):
+
+**Option A: Subdomain (Recommended — e.g., `notes.clientcompany.com`)**
+| Record Type | Host / Name | Value / Points To | TTL | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **CNAME** | `notes` | `prod.yourdomain.com` | 1800 (30m) | Automatically tracks your VPS even if server IP changes |
+
+**Option B: Apex / Root Domain (e.g., `clientcompany.com`)**
+| Record Type | Host / Name | Value / Points To | TTL | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **A** | `@` (or blank) | `YOUR_VPS_PUBLIC_IP` | 1800 (30m) | Apex domains cannot use CNAME according to RFC specs |
+
+---
+
+### 3.3 Step-by-Step Registrar Guides
+
+#### 1. Cloudflare DNS
+1. Log in to your Cloudflare Dashboard and select the target zone/domain.
+2. Navigate to **DNS &rarr; Records** and click **Add record**.
+3. For a subdomain (e.g., `notes.clientcompany.com`):
+   * **Type**: `CNAME`
+   * **Name**: `notes`
+   * **Target**: `prod.yourdomain.com`
+   * **Proxy status**: ⚠️ **DNS only (Grey Cloud)** during initial verification and SSL issuance so Let's Encrypt / Certbot can reach the origin server directly. Once verified, you may enable proxying if desired.
+   * **TTL**: Auto. Click **Save**.
+
+#### 2. GoDaddy
+1. Log in to your GoDaddy account and navigate to **Domain Portfolio**.
+2. Click the domain you wish to configure, then select the **DNS** tab.
+3. In the DNS Records section, click **Add New Record**:
+   * **Type**: `CNAME`
+   * **Name**: `notes` (or your chosen subdomain prefix)
+   * **Value**: `prod.yourdomain.com`
+   * **TTL**: `1/2 Hour` (or default). Click **Save**.
+
+#### 3. Namecheap
+1. Log in to your Namecheap Dashboard and go to **Domain List**.
+2. Click **Manage** next to your domain, then open the **Advanced DNS** tab.
+3. Click **Add New Record**:
+   * **Type**: `CNAME Record`
+   * **Host**: `notes`
+   * **Value**: `prod.yourdomain.com`
+   * **TTL**: Automatic. Click the green checkmark to save.
+
+#### 4. AWS Route 53
+1. Open the Route 53 console and navigate to **Hosted Zones**.
+2. Click your domain and click **Create record**:
+   * **Record name**: `notes`
+   * **Record type**: `CNAME`
+   * **Value**: `prod.yourdomain.com`
+   * **Routing policy**: Simple routing. Click **Create records**.
+
+---
+
+### 3.4 How to Verify DNS Propagation
+
+DNS propagation typically completes within 2 to 30 minutes. You can verify whether DNS is correctly pointing to your VPS from any terminal:
+
+```bash
+# 1. Test using nslookup (Windows, macOS, Linux)
+nslookup notes.clientcompany.com
+
+# 2. Test using dig (macOS, Linux)
+dig +short notes.clientcompany.com
+
+# 3. Test HTTP Host resolution directly against your VPS IP
+curl -H "Host: notes.clientcompany.com" http://YOUR_VPS_PUBLIC_IP/api/tenants/current/
+```
+
+**Expected API Response:**
+```json
+{
+  "id": 101,
+  "name": "Acme Corporation",
+  "domain": "notes.clientcompany.com",
+  "theme": {
+    "primary_color": "#4F46E5",
+    "logo_url": ""
+  }
+}
+```
+
+---
+
+### 3.5 Automated SSL / HTTPS Provisioning
+
+Once DNS is pointed to your server, issue a free, auto-renewing Let's Encrypt SSL certificate on your VPS using Certbot:
+
+```bash
+# Issue SSL for a custom domain (Nginx will automatically reload)
+sudo certbot --nginx -d notes.clientcompany.com
+
+# Test automatic renewal
+sudo certbot renew --dry-run
+```
+
+---
+
+### 3.6 In-App DNS Assistant & Interactive Setup Modal
+
+To ensure neither platform admins nor tenant customers are confused when connecting custom domains:
+* **Interactive DNS Setup Modal (`DnsSetupModal.jsx`)**: Available in the Tenant Settings page (`/settings`), Tenant Creation portal, and Platform Admin Tenants table. Features:
+  * One-click copy buttons for Host, Type, and Value.
+  * Direct registrar walkthroughs (Cloudflare, GoDaddy, Namecheap).
+  * In-app terminal command snippets for `nslookup` and `certbot`.
+* **Dedicated DNS Architecture Guide Page (`/dns-guide`)**: Full interactive guide accessible from the main navigation bar anytime.
+
+---
+
+## 4. Database Multi-Tenancy Architecture Options
 
 When onboarding a tenant via the Platform Admin portal, administrators can designate the tenant's **Database Isolation Strategy**:
 
@@ -118,7 +270,7 @@ When onboarding a tenant via the Platform Admin portal, administrators can desig
 
 ---
 
-## 4. Repository Structure & Deployment Assets
+## 5. Repository Structure & Deployment Assets
 
 ```
 .
@@ -189,7 +341,7 @@ When onboarding a tenant via the Platform Admin portal, administrators can desig
 
 ---
 
-## 5. Local Windows Development Setup
+## 6. Local Windows Development Setup
 
 ### 1. Configure Local Windows Domains
 Add local test domains to `C:\Windows\System32\drivers\etc\hosts`. Open PowerShell as **Administrator** and run:
@@ -234,7 +386,7 @@ Visit in your browser:
 
 ---
 
-## 6. Seed Accounts & Credentials
+## 7. Seed Accounts & Credentials
 
 | Portal / Tenant | Browser URL | Email | Password | Role |
 | :--- | :--- | :--- | :--- | :--- |
@@ -244,7 +396,7 @@ Visit in your browser:
 
 ---
 
-## 7. Linux VPS Deployment (One-Click Setup)
+## 8. Linux VPS Deployment (One-Click Setup)
 
 When deploying to a Linux VPS (Ubuntu 22.04 / 24.04 or Debian 11 / 12), **you do not need to manually write configuration files**. Everything is pre-configured and automated.
 
@@ -277,7 +429,7 @@ sudo ./deploy/scripts/setup_vps.sh
 
 ---
 
-## 8. PM2 Process Management Reference
+## 9. PM2 Process Management Reference
 
 PM2 keeps the Django/Gunicorn backend running 24/7, restarts it automatically on system reboot, and restarts if memory exceeds limits.
 
@@ -306,7 +458,7 @@ Configuration is stored in [`ecosystem.config.cjs`](file:///e:/note%20taker/ecos
 
 ---
 
-## 9. Fast Zero-Downtime Updates
+## 10. Fast Zero-Downtime Updates
 
 Whenever you push new changes to GitHub, update your VPS in seconds:
 
@@ -318,7 +470,7 @@ chmod +x deploy/scripts/deploy_update.sh
 
 ---
 
-## 10. Verification & Test Suite
+## 11. Verification & Test Suite
 
 ### Run Django Automated Tests (11 Tests)
 ```bash

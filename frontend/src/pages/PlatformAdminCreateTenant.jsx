@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { ArrowLeft, Plus, Building2, User, Globe, Database, Shield, Info, Check } from 'lucide-react';
+import DnsSetupModal from '../components/DnsSetupModal';
 
 export default function PlatformAdminCreateTenant() {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export default function PlatformAdminCreateTenant() {
   // Domain selection: SUBDOMAIN vs CUSTOM
   const [domainMode, setDomainMode] = useState('SUBDOMAIN'); // 'SUBDOMAIN' | 'CUSTOM'
   const [customDomainInput, setCustomDomainInput] = useState('');
+  const [isDnsModalOpen, setIsDnsModalOpen] = useState(false);
   
   // Database Strategy: SHARED_DB vs ISOLATED_SCHEMA vs SEPARATE_DB
   const [dbStrategy, setDbStrategy] = useState('SHARED_DB');
@@ -198,12 +200,26 @@ export default function PlatformAdminCreateTenant() {
                 <div style={{ fontSize: '0.775rem', color: '#93C5FD', marginTop: '0.5rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
                   <Info size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
                   <span>
-                    <strong>DNS Setup:</strong> The client will create a DNS <code>CNAME</code> pointing to your platform or an <code>A</code> record pointing to your VPS IP. Nginx forwards the <code>Host</code> header directly to Django.
+                    <strong>DNS Setup:</strong> Point a <code>CNAME</code> to your platform domain or an <code>A</code> record to your VPS Public IP.
                   </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDnsModalOpen(true)}
+                  className="btn btn-secondary btn-sm"
+                  style={{ marginTop: '0.75rem', fontSize: '0.775rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Globe size={13} color="#60A5FA" /> View Exact DNS Records & Registrar Guide
+                </button>
               </div>
             )}
           </div>
+
+          <DnsSetupModal
+            isOpen={isDnsModalOpen}
+            onClose={() => setIsDnsModalOpen(false)}
+            initialDomain={customDomainInput || 'clientdomain.com'}
+          />
 
           {/* SECTION 3: DATABASE ARCHITECTURE STRATEGY */}
           <div style={{ margin: '1.75rem 0', padding: '1.25rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>

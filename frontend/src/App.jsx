@@ -19,6 +19,7 @@ import PlatformAdminLogin from './pages/PlatformAdminLogin';
 import PlatformAdminDashboard from './pages/PlatformAdminDashboard';
 import PlatformAdminTenants from './pages/PlatformAdminTenants';
 import PlatformAdminCreateTenant from './pages/PlatformAdminCreateTenant';
+import DnsGuidePage from './pages/DnsGuidePage';
 
 function TenantProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -165,6 +166,9 @@ function AppContent() {
               </PlatformAdminProtectedRoute>
             }
           />
+
+          {/* DNS Configuration & Architecture Guide */}
+          <Route path="/dns-guide" element={<DnsGuidePage />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

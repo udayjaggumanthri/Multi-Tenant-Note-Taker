@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTenant } from '../context/TenantContext';
 import { useAuth } from '../context/AuthContext';
-import { BookOpen, Shield, LogOut, LogIn, LayoutDashboard, FileText, Settings, Building2 } from 'lucide-react';
+import { BookOpen, Shield, LogOut, LogIn, LayoutDashboard, FileText, Settings, Building2, Globe } from 'lucide-react';
 
 export default function Navbar() {
   const { tenant, isPlatform } = useTenant();
@@ -72,14 +72,32 @@ export default function Navbar() {
                       <Building2 size={16} /> Tenants
                     </span>
                   </Link>
+                  <Link
+                    to="/dns-guide"
+                    className={`nav-link ${isActive('/dns-guide') ? 'active' : ''}`}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Globe size={15} color="#60A5FA" /> DNS Guide
+                    </span>
+                  </Link>
                   <button onClick={handleLogout} className="btn btn-secondary btn-sm">
                     <LogOut size={14} /> Logout ({user.name.split(' ')[0]})
                   </button>
                 </>
               ) : (
-                <Link to="/admin/login" className="btn btn-primary btn-sm">
-                  <LogIn size={14} /> Admin Login
-                </Link>
+                <>
+                  <Link
+                    to="/dns-guide"
+                    className={`nav-link ${isActive('/dns-guide') ? 'active' : ''}`}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Globe size={15} color="#60A5FA" /> DNS Guide
+                    </span>
+                  </Link>
+                  <Link to="/admin/login" className="btn btn-primary btn-sm">
+                    <LogIn size={14} /> Admin Login
+                  </Link>
+                </>
               )}
             </>
           ) : (
@@ -114,14 +132,32 @@ export default function Navbar() {
                       <Settings size={16} /> Settings
                     </span>
                   </Link>
+                  <Link
+                    to="/dns-guide"
+                    className={`nav-link ${isActive('/dns-guide') ? 'active' : ''}`}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Globe size={15} color="#60A5FA" /> DNS Guide
+                    </span>
+                  </Link>
                   <button onClick={handleLogout} className="btn btn-secondary btn-sm">
                     <LogOut size={14} /> Logout
                   </button>
                 </>
               ) : (
-                <Link to="/login" className="btn btn-primary btn-sm">
-                  <LogIn size={14} /> Sign In
-                </Link>
+                <>
+                  <Link
+                    to="/dns-guide"
+                    className={`nav-link ${isActive('/dns-guide') ? 'active' : ''}`}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Globe size={15} color="#60A5FA" /> DNS Guide
+                    </span>
+                  </Link>
+                  <Link to="/login" className="btn btn-primary btn-sm">
+                    <LogIn size={14} /> Sign In
+                  </Link>
+                </>
               )}
             </>
           )}

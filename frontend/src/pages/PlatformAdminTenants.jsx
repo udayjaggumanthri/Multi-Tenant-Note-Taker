@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { Plus, Trash2, Power, ExternalLink, Globe, Database, Search } from 'lucide-react';
+import { Plus, Trash2, Power, ExternalLink, Globe, Database, Search, HelpCircle } from 'lucide-react';
+import DnsSetupModal from '../components/DnsSetupModal';
 
 export default function PlatformAdminTenants() {
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState(null);
+  const [isDnsModalOpen, setIsDnsModalOpen] = useState(false);
+  const [modalDomain, setModalDomain] = useState('company.com');
 
   const fetchTenants = async () => {
     try {
@@ -25,6 +28,11 @@ export default function PlatformAdminTenants() {
   useEffect(() => {
     fetchTenants();
   }, []);
+
+  const handleOpenDns = (domain) => {
+    setModalDomain(domain || 'company.com');
+    setIsDnsModalOpen(true);
+  };
 
   const handleToggleStatus = async (tenant) => {
     const nextStatus = tenant.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
@@ -62,9 +70,18 @@ export default function PlatformAdminTenants() {
           </p>
         </div>
 
-        <Link to="/admin/tenants/create" className="btn btn-primary" style={{ background: '#7C3AED' }}>
-          <Plus size={16} /> Onboard Tenant
-        </Link>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            onClick={() => handleOpenDns('customdomain.com')}
+            className="btn btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <Globe size={15} color="#60A5FA" /> DNS Setup Guide
+          </button>
+          <Link to="/admin/tenants/create" className="btn btn-primary" style={{ background: '#7C3AED' }}>
+            <Plus size={16} /> Onboard Tenant
+          </Link>
+        </div>
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -161,6 +178,14 @@ export default function PlatformAdminTenants() {
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
                         <button
+                          onClick={() => handleOpenDns(t.primary_domain)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                          title="View DNS Records & Setup Guide"
+                        >
+                          <Globe size={12} color="#60A5FA" /> DNS
+                        </button>
+                        <button
                           onClick={() => handleToggleStatus(t)}
                           className={`btn btn-sm ${t.status === 'ACTIVE' ? 'btn-danger' : 'btn-secondary'}`}
                           style={{ fontSize: '0.75rem' }}
@@ -185,6 +210,12 @@ export default function PlatformAdminTenants() {
           </table>
         </div>
       )}
+
+      <DnsSetupModal
+        isOpen={isDnsModalOpen}
+        onClose={() => setIsDnsModalOpen(false)}
+        initialDomain={modalDomain}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useTenant } from '../context/TenantContext';
 import { Settings, Save, CheckCircle, Palette, Building, Globe } from 'lucide-react';
+import DnsSetupModal from '../components/DnsSetupModal';
 
 export default function TenantSettings() {
   const { tenant, reloadTenant } = useTenant();
@@ -10,6 +11,7 @@ export default function TenantSettings() {
   const [websiteTitle, setWebsiteTitle] = useState('');
   const [description, setDescription] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#2563EB');
+  const [isDnsModalOpen, setIsDnsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -184,6 +186,35 @@ export default function TenantSettings() {
           </div>
         </form>
       </div>
+
+      {/* Domain & DNS Information Card */}
+      <div className="card" style={{ marginTop: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Custom Domain & DNS Status</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              Your workspace is mapped to: <span className="mono" style={{ color: '#60A5FA', fontWeight: 600 }}>{tenant?.domain}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsDnsModalOpen(true)}
+            className="btn btn-secondary btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <Globe size={14} color="#60A5FA" /> View DNS Instructions
+          </button>
+        </div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', lineHeight: 1.5 }}>
+          Need to connect your own branded domain (e.g. <code>notes.yourbrand.com</code>)? Open the DNS guide for copy-paste records and step-by-step instructions for Cloudflare, GoDaddy, and Namecheap.
+        </p>
+      </div>
+
+      <DnsSetupModal
+        isOpen={isDnsModalOpen}
+        onClose={() => setIsDnsModalOpen(false)}
+        initialDomain={tenant?.domain || 'company.com'}
+      />
     </div>
   );
 }
