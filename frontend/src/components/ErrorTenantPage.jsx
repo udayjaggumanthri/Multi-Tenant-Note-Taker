@@ -47,7 +47,7 @@ export default function ErrorTenantPage() {
             </>
           ) : isNotFound ? (
             <>
-              No active tenant found matching domain <span className="mono" style={{ color: '#F9FAFB' }}>{currentHost}</span>. According to multi-tenant security architecture (Phase 15), unknown domains receive an immediate 404 response.
+              No active tenant workspace found matching domain <span className="mono" style={{ color: '#F9FAFB' }}>{currentHost}</span>. Please verify that this custom domain or subdomain has been registered in the platform admin console and that DNS records point to this server.
             </>
           ) : (
             error?.message || 'An unexpected error occurred while resolving the tenant domain.'

@@ -6,6 +6,17 @@ class TenantStatus(models.TextChoices):
     INACTIVE = 'INACTIVE', 'Inactive'
 
 
+class DatabaseStrategy(models.TextChoices):
+    SHARED_DB = 'SHARED_DB', 'Shared Database (tenant_id)'
+    SEPARATE_DB = 'SEPARATE_DB', 'Dedicated Database'
+    ISOLATED_SCHEMA = 'ISOLATED_SCHEMA', 'Dedicated Schema'
+
+
+class DomainType(models.TextChoices):
+    SUBDOMAIN = 'SUBDOMAIN', 'Platform Subdomain'
+    CUSTOM = 'CUSTOM', 'Custom Domain'
+
+
 class Tenant(models.Model):
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=100, unique=True)
@@ -13,6 +24,11 @@ class Tenant(models.Model):
         max_length=20,
         choices=TenantStatus.choices,
         default=TenantStatus.ACTIVE
+    )
+    db_strategy = models.CharField(
+        max_length=30,
+        choices=DatabaseStrategy.choices,
+        default=DatabaseStrategy.SHARED_DB
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -33,6 +49,11 @@ class CustomDomain(models.Model):
         db_column='tenant_id'
     )
     domain = models.CharField(max_length=255, unique=True)
+    domain_type = models.CharField(
+        max_length=20,
+        choices=DomainType.choices,
+        default=DomainType.SUBDOMAIN
+    )
     is_primary = models.BooleanField(default=True)
     status = models.CharField(
         max_length=20,
@@ -47,7 +68,7 @@ class CustomDomain(models.Model):
         ordering = ['-is_primary', 'id']
 
     def __str__(self):
-        return f"{self.domain} -> Tenant {self.tenant_id}"
+        return f"{self.domain} ({self.domain_type}) -> Tenant {self.tenant_id}"
 
 
 class WebsiteSettings(models.Model):

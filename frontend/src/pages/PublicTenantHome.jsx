@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTenant } from '../context/TenantContext';
 import { useAuth } from '../context/AuthContext';
-import { Shield, BookOpen, Layers, CheckCircle, Database, Server, Globe, ArrowRight } from 'lucide-react';
+import { Shield, BookOpen, Layers, CheckCircle, Database, Server, Globe, ArrowRight, Lock, Sparkles } from 'lucide-react';
 
 export default function PublicTenantHome() {
   const { tenant, isPlatform } = useTenant();
@@ -10,25 +10,26 @@ export default function PublicTenantHome() {
 
   if (isPlatform) {
     return (
-      <div style={{ maxWidth: '900px', margin: '2rem auto' }}>
-        <div className="card" style={{ padding: '3.5rem 2.5rem', textAlign: 'center', marginBottom: '2.5rem' }}>
+      <div style={{ maxWidth: '960px', margin: '2rem auto' }}>
+        <div className="card" style={{ padding: '3.75rem 2.5rem', textAlign: 'center', marginBottom: '2.5rem' }}>
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.4rem 0.85rem',
-            background: 'rgba(168, 85, 247, 0.15)',
+            padding: '0.4rem 0.95rem',
+            background: 'rgba(168, 85, 247, 0.12)',
             border: '1px solid rgba(168, 85, 247, 0.3)',
             borderRadius: 'var(--radius-full)',
             color: '#C084FC',
             fontSize: '0.825rem',
             fontWeight: 700,
-            marginBottom: '1.5rem'
+            marginBottom: '1.5rem',
+            letterSpacing: '0.04em'
           }}>
-            <Shield size={16} /> MULTI-TENANT SAAS PROOF OF CONCEPT
+            <Shield size={15} /> ENTERPRISE MULTI-TENANT CLOUD PLATFORM
           </div>
 
-          <h1 style={{ fontSize: '2.75rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: '1.25rem' }}>
+          <h1 style={{ fontSize: '2.85rem', fontWeight: 800, letterSpacing: '-0.035em', lineHeight: 1.15, marginBottom: '1.25rem' }}>
             Multi-Tenant Note Taker <br />
             <span style={{
               background: 'linear-gradient(135deg, #60A5FA 0%, #A855F7 100%)',
@@ -40,46 +41,45 @@ export default function PublicTenantHome() {
           </h1>
 
           <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '680px', margin: '0 auto 2.25rem', lineHeight: 1.6 }}>
-            Demonstrating shared-database multi-tenancy with dynamic domain resolution.
-            One Django backend, One React frontend, and One PostgreSQL database powering isolated tenants.
+            Enterprise documentation management platform serving multiple isolated organizations with dynamic custom domain routing and strict database boundary enforcement.
           </p>
 
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link to="/admin/login" className="btn btn-primary" style={{ padding: '0.75rem 1.75rem', fontSize: '1rem' }}>
-              Platform Admin Portal <ArrowRight size={18} />
+              Platform Admin Console <ArrowRight size={18} />
             </Link>
             <a href="http://abc.localhost:5173" className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem' }}>
-              Launch Tenant 101 (ABC)
+              Launch ABC Electronics
             </a>
             <a href="http://xyz.localhost:5173" className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem' }}>
-              Launch Tenant 102 (XYZ)
+              Launch XYZ Furniture
             </a>
           </div>
         </div>
 
-        {/* Architecture Proof Cards */}
+        {/* Enterprise Architecture Pillars */}
         <div className="grid-3" style={{ marginBottom: '2.5rem' }}>
           <div className="card">
             <Globe color="#60A5FA" size={28} style={{ marginBottom: '1rem' }} />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Domain Resolution</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-              Incoming Host headers are normalized by <span className="mono">TenantMiddleware</span> and matched against <span className="mono">custom_domains</span>.
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Multi-Domain Routing</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.5 }}>
+              Automatic hostname resolution supports both platform subdomains and dedicated custom domains with seamless SSL routing.
             </p>
           </div>
 
           <div className="card">
             <Database color="#34D399" size={28} style={{ marginBottom: '1rem' }} />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Logical Isolation</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-              Single PostgreSQL database. Shared tables strictly scoped by <span className="mono">tenant_id</span>. Zero cross-tenant data leakage.
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Strict Data Isolation</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.5 }}>
+              PostgreSQL shared database with row-level boundary enforcement. Zero cross-tenant data exposure.
             </p>
           </div>
 
           <div className="card">
-            <Layers color="#F472B6" size={28} style={{ marginBottom: '1rem' }} />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Unified Codebase</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-              One React app and one Django REST backend serve all tenants and administrators dynamically without separate deployments.
+            <Layers color="#C084FC" size={28} style={{ marginBottom: '1rem' }} />
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Dynamic Theming</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.5 }}>
+              Single responsive frontend engine renders custom logos, brand colors, titles, and workspaces for each organization dynamically.
             </p>
           </div>
         </div>
@@ -87,15 +87,15 @@ export default function PublicTenantHome() {
     );
   }
 
-  // Tenant Public View (Phase 23)
+  // Tenant Public View
   const settings = tenant?.website_settings || {};
   const companyName = settings.company_name || tenant?.name || 'Company';
   const websiteTitle = settings.website_title || `Welcome to ${companyName}`;
-  const description = settings.description || 'Welcome to our multi-tenant document management and note-taking space.';
+  const description = settings.description || 'Welcome to our secure enterprise document management and note-taking workspace.';
 
   return (
-    <div style={{ maxWidth: '900px', margin: '2rem auto' }}>
-      <div className="card" style={{ padding: '3.5rem 2.5rem', textAlign: 'center', marginBottom: '2.5rem', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ maxWidth: '960px', margin: '2rem auto' }}>
+      <div className="card" style={{ padding: '3.75rem 2.5rem', textAlign: 'center', marginBottom: '2.5rem', position: 'relative', overflow: 'hidden' }}>
         <div style={{
           position: 'absolute',
           top: 0,
@@ -116,59 +116,62 @@ export default function PublicTenantHome() {
           color: 'var(--tenant-primary)',
           fontSize: '0.8rem',
           fontWeight: 700,
-          marginBottom: '1.5rem'
+          marginBottom: '1.5rem',
+          letterSpacing: '0.03em'
         }}>
-          TENANT DOMAIN: {tenant?.domain} • TENANT ID: {tenant?.id}
+          ORGANIZATION WORKSPACE: {tenant?.domain}
         </div>
 
-        <h1 style={{ fontSize: '2.75rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: '1.25rem' }}>
+        <h1 style={{ fontSize: '2.85rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: '1.25rem' }}>
           {websiteTitle}
         </h1>
 
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '650px', margin: '0 auto 2.25rem', lineHeight: 1.6 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '680px', margin: '0 auto 2.25rem', lineHeight: 1.6 }}>
           {description}
         </p>
 
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
           {isAuthenticated ? (
             <Link to="/dashboard" className="btn btn-primary" style={{ padding: '0.75rem 1.75rem', fontSize: '1rem' }}>
-              Open Tenant Dashboard <ArrowRight size={18} />
+              Open Workspace Dashboard <ArrowRight size={18} />
             </Link>
           ) : (
             <Link to="/login" className="btn btn-primary" style={{ padding: '0.75rem 1.75rem', fontSize: '1rem' }}>
-              Tenant Sign In <ArrowRight size={18} />
+              Sign In to Workspace <ArrowRight size={18} />
             </Link>
           )}
           <Link to="/notes" className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem' }}>
-            View Notes
+            View Documents
           </Link>
         </div>
       </div>
 
-      {/* Proof of Tenant Isolation Information Banner */}
+      {/* Enterprise Organization Infrastructure Panel */}
       <div className="card" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem', color: '#93C5FD' }}>
-          Multi-Tenant Architecture Status (Proof of Concept)
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: '#93C5FD' }}>
+          Organization Infrastructure & Boundary Status
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.875rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', fontSize: '0.875rem' }}>
           <div>
-            <span style={{ color: 'var(--text-muted)' }}>Tenant Name:</span>
-            <div style={{ fontWeight: 600 }}>{companyName}</div>
+            <span style={{ color: 'var(--text-muted)' }}>Organization:</span>
+            <div style={{ fontWeight: 600, marginTop: '2px' }}>{companyName}</div>
           </div>
           <div>
-            <span style={{ color: 'var(--text-muted)' }}>Tenant ID:</span>
-            <div className="mono" style={{ fontWeight: 600, color: 'var(--tenant-primary)' }}>{tenant?.id}</div>
+            <span style={{ color: 'var(--text-muted)' }}>Workspace Domain:</span>
+            <div className="mono" style={{ fontWeight: 600, color: '#60A5FA', marginTop: '2px' }}>{tenant?.domain}</div>
           </div>
           <div>
-            <span style={{ color: 'var(--text-muted)' }}>Primary Branding Color:</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+            <span style={{ color: 'var(--text-muted)' }}>Brand Accent:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginTop: '2px' }}>
               <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: settings.primary_color || 'var(--tenant-primary)' }} />
               <span className="mono">{settings.primary_color || '#2563EB'}</span>
             </div>
           </div>
           <div>
-            <span style={{ color: 'var(--text-muted)' }}>Database Isolation:</span>
-            <div style={{ fontWeight: 600, color: '#10B981' }}>Shared DB (tenant_id = {tenant?.id})</div>
+            <span style={{ color: 'var(--text-muted)' }}>Data Isolation:</span>
+            <div style={{ fontWeight: 600, color: '#10B981', marginTop: '2px' }}>
+              Active (tenant_id = {tenant?.id})
+            </div>
           </div>
         </div>
       </div>

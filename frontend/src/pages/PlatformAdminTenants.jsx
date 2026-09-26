@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { Plus, Trash2, Power, ExternalLink, CheckCircle, XCircle, Search } from 'lucide-react';
+import { Plus, Trash2, Power, ExternalLink, Globe, Database, Search } from 'lucide-react';
 
 export default function PlatformAdminTenants() {
   const [tenants, setTenants] = useState([]);
@@ -53,17 +53,17 @@ export default function PlatformAdminTenants() {
   );
 
   return (
-    <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1140px', margin: '0 auto' }}>
       <div className="page-header flex-between">
         <div>
-          <h1 className="page-title">SaaS Tenants</h1>
+          <h1 className="page-title">Enterprise Tenants</h1>
           <p className="page-desc">
-            Manage all active and inactive tenants, custom domain bindings, and access
+            Centralized directory of all onboarded organizations, custom domain bindings, and database isolation strategies.
           </p>
         </div>
 
         <Link to="/admin/tenants/create" className="btn btn-primary" style={{ background: '#7C3AED' }}>
-          <Plus size={16} /> Create Tenant
+          <Plus size={16} /> Onboard Tenant
         </Link>
       </div>
 
@@ -74,7 +74,7 @@ export default function PlatformAdminTenants() {
           <input
             type="text"
             className="form-control"
-            placeholder="Search by tenant name, domain, or ID..."
+            placeholder="Search organizations by name, domain, or ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -91,66 +91,96 @@ export default function PlatformAdminTenants() {
             <thead>
               <tr>
                 <th>Tenant ID</th>
-                <th>Tenant Name</th>
-                <th>Slug</th>
-                <th>Domain</th>
+                <th>Organization</th>
+                <th>Domain & Routing</th>
+                <th>DB Strategy</th>
                 <th>Status</th>
-                <th>Notes Count</th>
-                <th>Created Date</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th>Total Notes</th>
+                <th>Created</th>
+                <th style={{ textAlign: 'right' }}>Controls</th>
               </tr>
             </thead>
             <tbody>
-              {filteredTenants.map((t) => (
-                <tr key={t.id}>
-                  <td className="mono" style={{ fontWeight: 700, color: '#60A5FA' }}>
-                    #{t.id}
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{t.name}</td>
-                  <td className="mono" style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                    {t.slug}
-                  </td>
-                  <td className="mono" style={{ fontSize: '0.85rem' }}>
-                    <a
-                      href={`http://${t.primary_domain}:${window.location.port || '5173'}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ color: '#60A5FA', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                    >
-                      {t.primary_domain} <ExternalLink size={12} />
-                    </a>
-                  </td>
-                  <td>
-                    <span className={`badge ${t.status === 'ACTIVE' ? 'badge-active' : 'badge-inactive'}`}>
-                      {t.status}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{t.notes_count}</td>
-                  <td style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                    {new Date(t.created_at).toLocaleDateString()}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
-                      <button
-                        onClick={() => handleToggleStatus(t)}
-                        className={`btn btn-sm ${t.status === 'ACTIVE' ? 'btn-danger' : 'btn-secondary'}`}
-                        style={{ fontSize: '0.75rem' }}
-                        title={t.status === 'ACTIVE' ? 'Deactivate Tenant' : 'Activate Tenant'}
-                      >
-                        <Power size={13} /> {t.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(t.id, t.name)}
-                        className="btn btn-danger btn-sm"
-                        style={{ padding: '0.375rem 0.5rem' }}
-                        title="Delete Tenant"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filteredTenants.map((t) => {
+                const primaryDomainObj = t.domains?.find((d) => d.is_primary) || t.domains?.[0];
+                const domainType = primaryDomainObj?.domain_type || 'SUBDOMAIN';
+
+                return (
+                  <tr key={t.id}>
+                    <td className="mono" style={{ fontWeight: 700, color: '#60A5FA' }}>
+                      #{t.id}
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{t.name}</div>
+                      <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {t.slug}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                        <a
+                          href={`http://${t.primary_domain}:${window.location.port || '5173'}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mono"
+                          style={{ color: '#60A5FA', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          {t.primary_domain} <ExternalLink size={11} />
+                        </a>
+                      </div>
+                      <span className="badge" style={{
+                        fontSize: '0.675rem',
+                        padding: '0.15rem 0.45rem',
+                        background: domainType === 'CUSTOM' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+                        color: domainType === 'CUSTOM' ? '#C084FC' : '#93C5FD',
+                        border: `1px solid ${domainType === 'CUSTOM' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`
+                      }}>
+                        {domainType === 'CUSTOM' ? 'Custom Domain' : 'Subdomain'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge" style={{
+                        fontSize: '0.675rem',
+                        padding: '0.15rem 0.45rem',
+                        background: t.db_strategy === 'SHARED_DB' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                        color: t.db_strategy === 'SHARED_DB' ? '#34D399' : '#FCD34D',
+                        border: `1px solid ${t.db_strategy === 'SHARED_DB' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)'}`
+                      }}>
+                        {t.db_strategy_display || 'Shared DB'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge ${t.status === 'ACTIVE' ? 'badge-active' : 'badge-inactive'}`}>
+                        {t.status}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{t.notes_count}</td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {new Date(t.created_at).toLocaleDateString()}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => handleToggleStatus(t)}
+                          className={`btn btn-sm ${t.status === 'ACTIVE' ? 'btn-danger' : 'btn-secondary'}`}
+                          style={{ fontSize: '0.75rem' }}
+                          title={t.status === 'ACTIVE' ? 'Deactivate Access' : 'Reactivate Access'}
+                        >
+                          <Power size={13} /> {t.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(t.id, t.name)}
+                          className="btn btn-danger btn-sm"
+                          style={{ padding: '0.375rem 0.5rem' }}
+                          title="Delete Organization"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

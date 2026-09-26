@@ -1,14 +1,16 @@
 from django.db import transaction
 from django.utils.text import slugify
 from rest_framework import serializers
-from tenants.models import Tenant, CustomDomain, WebsiteSettings, TenantStatus
+from tenants.models import Tenant, CustomDomain, WebsiteSettings, TenantStatus, DatabaseStrategy, DomainType
 from users.models import User, UserRole
 
 
 class CustomDomainSerializer(serializers.ModelSerializer):
+    domain_type_display = serializers.CharField(source='get_domain_type_display', read_only=True)
+
     class Meta:
         model = CustomDomain
-        fields = ['id', 'domain', 'is_primary', 'status', 'created_at']
+        fields = ['id', 'domain', 'domain_type', 'domain_type_display', 'is_primary', 'status', 'created_at']
 
 
 class WebsiteSettingsSerializer(serializers.ModelSerializer):
@@ -25,12 +27,14 @@ class TenantSerializer(serializers.ModelSerializer):
     website_settings = WebsiteSettingsSerializer(read_only=True)
     primary_domain = serializers.SerializerMethodField()
     notes_count = serializers.SerializerMethodField()
+    db_strategy_display = serializers.CharField(source='get_db_strategy_display', read_only=True)
 
     class Meta:
         model = Tenant
         fields = [
-            'id', 'name', 'slug', 'status', 'created_at', 'updated_at',
-            'domains', 'website_settings', 'primary_domain', 'notes_count'
+            'id', 'name', 'slug', 'status', 'db_strategy', 'db_strategy_display',
+            'created_at', 'updated_at', 'domains', 'website_settings',
+            'primary_domain', 'notes_count'
         ]
 
     def get_primary_domain(self, obj):
@@ -48,6 +52,8 @@ class CreateTenantSerializer(serializers.Serializer):
     admin_email = serializers.EmailField()
     admin_password = serializers.CharField(write_only=True, min_length=6)
     domain = serializers.CharField(max_length=255)
+    domain_type = serializers.ChoiceField(choices=DomainType.choices, default=DomainType.SUBDOMAIN)
+    db_strategy = serializers.ChoiceField(choices=DatabaseStrategy.choices, default=DatabaseStrategy.SHARED_DB)
     primary_color = serializers.CharField(max_length=50, required=False, default='#2563EB')
     website_title = serializers.CharField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
@@ -74,7 +80,6 @@ class CreateTenantSerializer(serializers.Serializer):
         name = validated_data['name']
         slug = validated_data.get('slug') or slugify(name)
 
-        # Ensure slug uniqueness
         base_slug = slug
         counter = 1
         while Tenant.objects.filter(slug=slug).exists():
@@ -85,16 +90,19 @@ class CreateTenantSerializer(serializers.Serializer):
         admin_email = validated_data['admin_email']
         admin_password = validated_data['admin_password']
         domain_name = validated_data['domain']
+        domain_type = validated_data.get('domain_type', DomainType.SUBDOMAIN)
+        db_strategy = validated_data.get('db_strategy', DatabaseStrategy.SHARED_DB)
         primary_color = validated_data.get('primary_color', '#2563EB')
         website_title = validated_data.get('website_title', '') or f"Welcome to {name}"
-        description = validated_data.get('description', '') or f"Official notes and documents for {name}."
+        description = validated_data.get('description', '') or f"Official workspace and documentation portal for {name}."
 
         with transaction.atomic():
-            # 1. Create tenant
+            # 1. Create tenant with chosen DB strategy
             tenant = Tenant.objects.create(
                 name=name,
                 slug=slug,
-                status=TenantStatus.ACTIVE
+                status=TenantStatus.ACTIVE,
+                db_strategy=db_strategy
             )
 
             # 2. Create tenant administrator
@@ -106,10 +114,11 @@ class CreateTenantSerializer(serializers.Serializer):
                 tenant=tenant
             )
 
-            # 3. Create custom domain
+            # 3. Create custom domain with domain_type
             custom_domain = CustomDomain.objects.create(
                 tenant=tenant,
                 domain=domain_name,
+                domain_type=domain_type,
                 is_primary=True,
                 status=TenantStatus.ACTIVE
             )
