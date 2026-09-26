@@ -1,9 +1,21 @@
+import ipaddress
 import logging
 from django.conf import settings
 from django.http import JsonResponse
 from tenants.models import CustomDomain, TenantStatus
 
 logger = logging.getLogger('tenant')
+
+
+def is_ip_address(host: str) -> bool:
+    """Checks whether the hostname is an IPv4 or IPv6 address."""
+    if not host:
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
 
 
 def normalize_hostname(host_header: str) -> str:
@@ -54,9 +66,25 @@ class TenantMiddleware:
 
         path = request.path
 
+        # -------------------------------------------------------------
+        # SECURITY LAYER 1: DIRECT IP ACCESS PREVENTION
+        # -------------------------------------------------------------
+        # Direct IP access (e.g. http://203.0.113.10/ or external IPs) is prohibited.
+        # This prevents port scanners, bots, and attackers from accessing the application
+        # or probing endpoints directly without an authorized domain name.
+        if is_ip_address(hostname):
+            # Allow loopback (127.0.0.1) ONLY for local development when DEBUG=True
+            if not (settings.DEBUG and hostname in ['127.0.0.1', '::1']):
+                logger.warning(f"Blocked direct IP access attempt: {hostname} | Path: {path}")
+                return JsonResponse({
+                    'error': 'Direct IP access is prohibited for security reasons. Please access the platform via your registered domain name.',
+                    'code': 'DIRECT_IP_ACCESS_DENIED',
+                    'host': hostname
+                }, status=403)
+
         # Platform domain configuration
         platform_domain = getattr(settings, 'PLATFORM_DOMAIN', 'prod.localhost').lower()
-        is_platform_host = (hostname == platform_domain or hostname in ['localhost', '127.0.0.1'])
+        is_platform_host = (hostname == platform_domain or (settings.DEBUG and hostname in ['localhost', '127.0.0.1']))
 
         # Allow Django admin and platform admin APIs on platform domain or localhost
         if is_platform_host:

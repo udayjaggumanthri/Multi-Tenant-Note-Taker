@@ -94,6 +94,18 @@ def run_tests():
     assert "Tenant / domain not configured." in data.get("error", ""), f"Unexpected error message: {data}"
     print("  [OK] SUCCESS: unknown.localhost returned 404 'Tenant / domain not configured.'")
 
+    # 4b. Security: Direct Public IP Access Prevention
+    print("\n[TEST 4b] Security -> Direct Public IP Access Prevention (198.51.100.24)")
+    status, data = make_request("/api/tenant/", host="198.51.100.24")
+    assert status in (400, 403), f"Expected 400 or 403, got {status}: {data}"
+    print(f"  [OK] SUCCESS: Direct IP access blocked with HTTP {status} (Host Header Security Enforced)")
+
+    # 4c. Security: Rogue / Unregistered Domain Pointing
+    print("\n[TEST 4c] Security -> Rogue / Unregistered Domain Pointing (evil-attacker.com)")
+    status, data = make_request("/api/tenant/", host="evil-attacker.com")
+    assert status in (400, 404), f"Expected 400 or 404, got {status}: {data}"
+    print(f"  [OK] SUCCESS: Rogue domain evil-attacker.com blocked with HTTP {status} (Not in Allowed/Registered Domains)")
+
     # 5. Cross-Tenant Login Isolation (Phase 12)
     print("\n[TEST 5] Cross-Tenant Authentication Isolation")
     # Ravi (tenant 101) attempts to login to xyz.localhost (tenant 102)

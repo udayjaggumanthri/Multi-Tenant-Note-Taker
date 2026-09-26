@@ -108,6 +108,13 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
           >
             Testing & Propagation
           </button>
+          <button
+            onClick={() => setActiveTab('security')}
+            className={`nav-link ${activeTab === 'security' ? 'active' : ''}`}
+            style={{ border: 'none', background: 'none', cursor: 'pointer', paddingBottom: '0.75rem', color: activeTab === 'security' ? '#FCA5A5' : undefined }}
+          >
+            🛡️ IP & Domain Security
+          </button>
         </div>
 
         {/* TAB 1: REQUIRED DNS RECORDS */}
@@ -296,6 +303,48 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
               <pre className="mono" style={{ color: '#93C5FD', fontSize: '0.825rem', margin: 0 }}>
                 {`sudo certbot --nginx -d ${domain}`}
               </pre>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: IP & HOST SECURITY */}
+        {activeTab === 'security' && (
+          <div>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.5rem', color: '#FCA5A5' }}>
+              Host Protection & Direct IP Access Prevention
+            </h4>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: 1.5 }}>
+              If an external party or internet scanner discovers your server's public IP address, our multi-tenant architecture protects your platform across 4 distinct layers:
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                <strong style={{ color: '#60A5FA', fontSize: '0.85rem' }}>1. Nginx Connection Drop (Code 444):</strong>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Any direct IP visit or unrecognized domain is caught by Nginx's <code>default_server</code> and immediately closed without sending any response headers or bytes.
+                </p>
+              </div>
+
+              <div style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                <strong style={{ color: '#34D399', fontSize: '0.85rem' }}>2. Django Direct IP Blocker:</strong>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Django <code>TenantMiddleware</code> inspects the <code>Host</code> header. Public IP addresses are strictly rejected with HTTP <code>403 DIRECT_IP_ACCESS_DENIED</code>.
+                </p>
+              </div>
+
+              <div style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                <strong style={{ color: '#F59E0B', fontSize: '0.85rem' }}>3. Rogue Domain Pointing Prevention:</strong>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  If someone points their own unauthorized domain (e.g. <code>evil-site.com &rarr; YOUR_IP</code>), the database lookup fails and returns <code>404 TENANT_NOT_FOUND</code>.
+                </p>
+              </div>
+
+              <div style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                <strong style={{ color: '#A78BFA', fontSize: '0.85rem' }}>4. Cloudflare Proxy Protection:</strong>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  In production, enabling Cloudflare CDN masks your origin IP completely from DNS lookups.
+                </p>
+              </div>
             </div>
           </div>
         )}

@@ -237,6 +237,61 @@ To ensure neither platform admins nor tenant customers are confused when connect
 
 ---
 
+### 3.7 Security Architecture: Direct IP Access Prevention & Rogue Domain Pointing
+
+#### The Security Threat Model:
+In a multi-tenant platform, when your application server is deployed on a Linux VPS with a public IP (e.g. `203.0.113.10`), two major attack vectors arise:
+1. **Direct IP Access / Port Scanners**: Automated bots (Shodan, Censys, masscan) scan public IPv4 addresses and hit `http://203.0.113.10` directly without a domain name. If unprotected, scanners can fingerprint your web stack, access static bundles, or probe endpoints.
+2. **Rogue / Unauthorized Domain Pointing ("Host Spoofing" & Parasitic Hosting)**: An attacker who owns `evil-phishing.com` creates a DNS `A` or `CNAME` record pointing to your server's IP address. If your web server blindly proxies every incoming request, your application would be served under `evil-phishing.com`!
+
+#### Our 4-Layer Defense-in-Depth Solution:
+
+```
+                            INCOMING REQUEST
+                                   |
+                  +----------------+----------------+
+                  |                                 |
+         Direct IP Access                 Rogue / Unregistered Domain
+      (http://203.0.113.10/)               (evil-phishing-site.com)
+                  |                                 |
+                  v                                 v
+        [ LAYER 1: NGINX DEFAULT_SERVER BLOCK (PORT 80 & 443) ]
+        • listen 80 default_server; server_name _; return 444;
+        • ssl_reject_handshake on; (drops TLS before certificate exchange)
+        • Nginx closes TCP connection immediately with 0 bytes sent.
+        • Port scanners and rogue domains receive NO HTTP RESPONSE.
+                                   |
+                         (If request reaches Django)
+                                   v
+        [ LAYER 2: DJANGO TENANT MIDDLEWARE IP DETECTION ]
+        • Normalizes Host header (e.g. "198.51.100.24")
+        • is_ip_address(host) detects IPv4/IPv6 addresses
+        • Strictly blocks direct IP access with HTTP 403:
+          {"error": "Direct IP access is prohibited", "code": "DIRECT_IP_ACCESS_DENIED"}
+                                   |
+                                   v
+        [ LAYER 3: DATABASE DOMAIN WHITELIST MATCHING ]
+        • SQL Query: SELECT * FROM custom_domains WHERE domain = host
+        • If domain is NOT registered to an active tenant:
+          Rejects immediately with HTTP 404 / 400:
+          {"error": "Tenant / domain not configured", "code": "TENANT_NOT_FOUND"}
+        • Attacker CANNOT hijack, spoof, or serve your app on rogue domains.
+                                   |
+                                   v
+        [ LAYER 4: CLOUDFLARE ORIGIN MASKING & UFW FIREWALL ]
+        • Public DNS points to Cloudflare proxy (Orange Cloud)
+        • Real VPS IP is never exposed in public DNS records
+        • Linux UFW firewall configured to only permit traffic from Cloudflare IPs.
+```
+
+#### Automated Security Tests:
+Our test suite includes dedicated security tests verifying this defense:
+* `test_direct_ip_access_blocked`: Verifies that requests with a direct IP host header return `403 DIRECT_IP_ACCESS_DENIED`.
+* `test_unregistered_domain_blocked`: Verifies that requests with an unauthorized rogue domain return `404 TENANT_NOT_FOUND`.
+* `test_domain_verification_endpoint`: Verifies that administrators can validate live DNS records before routing traffic.
+
+---
+
 ## 4. Database Multi-Tenancy Architecture Options
 
 When onboarding a tenant via the Platform Admin portal, administrators can designate the tenant's **Database Isolation Strategy**:

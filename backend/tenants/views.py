@@ -132,3 +132,51 @@ class PlatformAdminStatsView(APIView):
             'inactive_tenants': inactive_tenants,
             'total_notes': total_notes
         })
+
+
+class VerifyDomainView(APIView):
+    """
+    Checks real-time DNS propagation for a domain and verifies configuration.
+    Performs DNS resolution (socket.gethostbyname) and marks the domain as verified.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, domain_id):
+        import socket
+        domain_obj = get_object_or_404(CustomDomain, id=domain_id)
+
+        user = request.user
+        # Allow Platform Admin or Tenant Admin of the owning tenant
+        if not (getattr(user, 'role', None) == 'PLATFORM_ADMIN' or (getattr(user, 'role', None) == 'TENANT_ADMIN' and user.tenant_id == domain_obj.tenant_id)):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        domain_name = domain_obj.domain
+
+        # Local development domains (.localhost) always pass
+        if domain_name.endswith('.localhost') or domain_name in ['localhost', '127.0.0.1']:
+            domain_obj.is_verified = True
+            domain_obj.save()
+            return Response({
+                'verified': True,
+                'domain': domain_name,
+                'resolved_ip': '127.0.0.1',
+                'message': f"Domain '{domain_name}' is verified successfully for local development."
+            })
+
+        try:
+            resolved_ip = socket.gethostbyname(domain_name)
+            domain_obj.is_verified = True
+            domain_obj.save()
+            return Response({
+                'verified': True,
+                'domain': domain_name,
+                'resolved_ip': resolved_ip,
+                'message': f"DNS verification passed! '{domain_name}' resolves to {resolved_ip}."
+            })
+        except socket.gaierror:
+            return Response({
+                'verified': False,
+                'domain': domain_name,
+                'resolved_ip': None,
+                'message': f"DNS record not found for '{domain_name}'. Please ensure your CNAME or A-record has propagated."
+            }, status=status.HTTP_400_BAD_REQUEST)

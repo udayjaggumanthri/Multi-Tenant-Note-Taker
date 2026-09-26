@@ -55,6 +55,8 @@ class CustomDomain(models.Model):
         default=DomainType.SUBDOMAIN
     )
     is_primary = models.BooleanField(default=True)
+    is_verified = models.BooleanField(default=True)
+    verification_token = models.CharField(max_length=64, blank=True, default='')
     status = models.CharField(
         max_length=20,
         choices=TenantStatus.choices,

@@ -10,7 +10,10 @@ class CustomDomainSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomDomain
-        fields = ['id', 'domain', 'domain_type', 'domain_type_display', 'is_primary', 'status', 'created_at']
+        fields = [
+            'id', 'domain', 'domain_type', 'domain_type_display',
+            'is_primary', 'is_verified', 'verification_token', 'status', 'created_at'
+        ]
 
 
 class WebsiteSettingsSerializer(serializers.ModelSerializer):
@@ -59,8 +62,12 @@ class CreateTenantSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
 
     def validate_domain(self, value):
-        from tenants.middleware import normalize_hostname
+        from tenants.middleware import normalize_hostname, is_ip_address
         normalized = normalize_hostname(value)
+        if not normalized:
+            raise serializers.ValidationError("Domain name cannot be empty.")
+        if is_ip_address(normalized):
+            raise serializers.ValidationError("An IP address cannot be registered as a domain name.")
         if CustomDomain.objects.filter(domain=normalized).exists():
             raise serializers.ValidationError(f"Domain '{normalized}' is already registered.")
         return normalized

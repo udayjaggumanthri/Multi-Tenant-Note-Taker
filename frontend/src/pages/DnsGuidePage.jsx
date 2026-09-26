@@ -199,6 +199,73 @@ export default function DnsGuidePage() {
           Certbot automatically provisions the certificate, enables HTTP to HTTPS redirection, and configures automated 90-day renewal in systemd.
         </p>
       </div>
+
+      {/* SECURITY & HOST PROTECTION SECTION */}
+      <div className="card" style={{ marginTop: '2rem', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.02)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
+          <ShieldCheck size={22} color="#EF4444" />
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FCA5A5' }}>
+            Security: What If Someone Discovers Our VPS IP & Points Their Domain to It?
+          </h3>
+        </div>
+
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+          A common security concern in multi-tenant SaaS architecture is: <em>"If an attacker or port scanner finds our server IP address, can they point a rogue domain to our server or scan our application directly?"</em>
+          <br /><br />
+          Our platform implements a <strong>4-Layer Defense-in-Depth architecture</strong> that completely prevents unauthorized domain pointing, direct IP scans, and host header spoofing:
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          {/* Layer 1 */}
+          <div style={{ background: '#0B0F19', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#60A5FA', marginBottom: '0.4rem' }}>
+              LAYER 1: NGINX DEFAULT_SERVER DROP
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+              Nginx includes a <code>default_server</code> catch-all block. Any HTTP or HTTPS request that does not match an authorized tenant domain is dropped immediately using Nginx code <code>444</code> (Connection Closed Without Response). Zero bytes sent.
+            </p>
+          </div>
+
+          {/* Layer 2 */}
+          <div style={{ background: '#0B0F19', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#34D399', marginBottom: '0.4rem' }}>
+              LAYER 2: DIRECT IP ACCESS DENIAL
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+              Django's <code>TenantMiddleware</code> inspects every incoming <code>Host</code> header. If a visitor accesses the public IP directly, the middleware rejects the request with HTTP <code>403 DIRECT_IP_ACCESS_DENIED</code>.
+            </p>
+          </div>
+
+          {/* Layer 3 */}
+          <div style={{ background: '#0B0F19', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#F59E0B', marginBottom: '0.4rem' }}>
+              LAYER 3: DATABASE DOMAIN WHITELIST
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+              If an attacker configures <code>evil-site.com &rarr; YOUR_IP</code>, Django performs a strict database lookup in <code>custom_domains</code>. Since the domain is unregistered, it is immediately blocked with HTTP 404/400.
+            </p>
+          </div>
+
+          {/* Layer 4 */}
+          <div style={{ background: '#0B0F19', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#A78BFA', marginBottom: '0.4rem' }}>
+              LAYER 4: CLOUDFLARE ORIGIN MASKING
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+              In production, placing Cloudflare in front of the platform hides your origin VPS IP from DNS lookups. Linux UFW firewall rules can be configured to only accept incoming traffic from Cloudflare proxy IPs.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ background: 'rgba(0, 0, 0, 0.4)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+          <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '0.4rem' }}>
+            Verification in Test Suite:
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+            Automated test cases <code>test_direct_ip_access_blocked</code> and <code>test_unregistered_domain_blocked</code> continuously verify that direct IP and rogue domain pointing are 100% blocked.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

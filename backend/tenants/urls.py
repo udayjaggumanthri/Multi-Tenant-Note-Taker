@@ -4,7 +4,8 @@ from tenants.views import (
     TenantPublicView,
     WebsiteSettingsView,
     PlatformAdminTenantViewSet,
-    PlatformAdminStatsView
+    PlatformAdminStatsView,
+    VerifyDomainView
 )
 
 router = DefaultRouter()
@@ -14,5 +15,6 @@ urlpatterns = [
     path('tenant/', TenantPublicView.as_view(), name='tenant-public'),
     path('website/', WebsiteSettingsView.as_view(), name='tenant-website-settings'),
     path('admin/stats/', PlatformAdminStatsView.as_view(), name='admin-stats'),
+    path('domains/<int:domain_id>/verify/', VerifyDomainView.as_view(), name='domain-verify'),
     path('', include(router.urls)),
 ]

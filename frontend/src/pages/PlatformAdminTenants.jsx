@@ -145,15 +145,26 @@ export default function PlatformAdminTenants() {
                           {t.primary_domain} <ExternalLink size={11} />
                         </a>
                       </div>
-                      <span className="badge" style={{
-                        fontSize: '0.675rem',
-                        padding: '0.15rem 0.45rem',
-                        background: domainType === 'CUSTOM' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)',
-                        color: domainType === 'CUSTOM' ? '#C084FC' : '#93C5FD',
-                        border: `1px solid ${domainType === 'CUSTOM' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`
-                      }}>
-                        {domainType === 'CUSTOM' ? 'Custom Domain' : 'Subdomain'}
-                      </span>
+                      <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', marginTop: '0.25rem' }}>
+                        <span className="badge" style={{
+                          fontSize: '0.675rem',
+                          padding: '0.15rem 0.45rem',
+                          background: domainType === 'CUSTOM' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+                          color: domainType === 'CUSTOM' ? '#C084FC' : '#93C5FD',
+                          border: `1px solid ${domainType === 'CUSTOM' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`
+                        }}>
+                          {domainType === 'CUSTOM' ? 'Custom Domain' : 'Subdomain'}
+                        </span>
+                        {t.domains?.[0]?.is_verified ? (
+                          <span style={{ fontSize: '0.675rem', color: '#34D399', fontWeight: 600 }}>
+                            ✓ DNS Active
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.675rem', color: '#FBBF24', fontWeight: 600 }}>
+                            ⏳ Pending DNS
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <span className="badge" style={{

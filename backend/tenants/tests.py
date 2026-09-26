@@ -1,4 +1,4 @@
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from rest_framework import status
 from tenants.models import Tenant, CustomDomain, WebsiteSettings, TenantStatus
 from users.models import User, UserRole
@@ -239,3 +239,44 @@ class MultiTenantArchitectureTests(TestCase):
         resolve_res = client.get('/api/tenant/', HTTP_HOST='delta.localhost')
         self.assertEqual(resolve_res.status_code, status.HTTP_200_OK)
         self.assertEqual(resolve_res.json()['name'], 'Delta Logistics')
+
+    # ========================================================
+    # 7. SECURITY: DIRECT IP & HOST HEADER PROTECTION
+    # ========================================================
+    @override_settings(ALLOWED_HOSTS=['*'])
+    def test_direct_ip_access_blocked(self):
+        """Direct access via public IP address must be rejected with 403 Forbidden."""
+        client = Client()
+        res = client.get('/api/tenant/', HTTP_HOST='198.51.100.24')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        data = res.json()
+        self.assertEqual(data.get('code'), 'DIRECT_IP_ACCESS_DENIED')
+
+    @override_settings(ALLOWED_HOSTS=['*'])
+    def test_unregistered_domain_blocked(self):
+        """Pointing an unauthorized/unregistered domain to server must return 404."""
+        client = Client()
+        res = client.get('/api/tenant/', HTTP_HOST='evil-attacker.com')
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+        data = res.json()
+        self.assertEqual(data.get('code'), 'TENANT_NOT_FOUND')
+
+    def test_domain_verification_endpoint(self):
+        """Platform Admin can verify DNS configuration for a domain."""
+        client = Client()
+        login_res = client.post('/api/auth/login/', {
+            'email': 'admin@prod.com',
+            'password': 'AdminPass@123',
+            'is_platform_login': True
+        }, HTTP_HOST='prod.localhost')
+        token = login_res.json()['token']
+
+        # Verify abc.localhost domain
+        verify_res = client.post(
+            f'/api/domains/{self.domain_101.id}/verify/',
+            HTTP_HOST='prod.localhost',
+            HTTP_AUTHORIZATION=f'Token {token}'
+        )
+        self.assertEqual(verify_res.status_code, status.HTTP_200_OK)
+        self.assertTrue(verify_res.json()['verified'])
+
