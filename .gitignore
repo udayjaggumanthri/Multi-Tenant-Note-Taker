@@ -1,0 +1,30 @@
+# Environments and secrets
+.env
+.env.local
+.env.*.local
+
+# Python / Django
+venv/
+env/
+ENV/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+db.sqlite3
+*.log
+
+# Node / Vite
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# IDE & Editor artifacts
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
