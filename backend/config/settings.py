@@ -23,6 +23,16 @@ if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
 
 PLATFORM_DOMAIN = os.getenv('PLATFORM_DOMAIN', 'prod.localhost').strip().lower()
 
+# Platform Base Apex Domain for tenant subdomains (e.g. 'flowiq.in' or 'localhost')
+PLATFORM_BASE_DOMAIN = os.getenv('PLATFORM_BASE_DOMAIN', '').strip().lower()
+if not PLATFORM_BASE_DOMAIN:
+    clean_pdomain = PLATFORM_DOMAIN.split(':')[0]
+    for prefix in ['prod.', 'app.', 'admin.', 'platform.']:
+        if clean_pdomain.startswith(prefix):
+            clean_pdomain = clean_pdomain[len(prefix):]
+            break
+    PLATFORM_BASE_DOMAIN = clean_pdomain
+
 # ==============================================================================
 # DJANGO-TENANTS APPLICATION CONFIGURATION
 # ==============================================================================

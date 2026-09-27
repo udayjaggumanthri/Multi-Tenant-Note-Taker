@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import transaction
 from django.utils.text import slugify
 from rest_framework import serializers
@@ -146,6 +147,21 @@ class CreateTenantSerializer(serializers.Serializer):
                 verification_token=verification_token,
                 status=TenantStatus.ACTIVE
             )
+
+            # In local development (DEBUG=True), automatically bind <slug>.localhost as alias
+            # so developers can test immediately on dev server (:5173 / :8000)
+            if getattr(settings, 'DEBUG', False) and domain_name != f"{slug}.localhost":
+                dev_alias = f"{slug}.localhost"
+                if not Domain.objects.filter(domain=dev_alias).exists():
+                    Domain.objects.create(
+                        tenant=tenant,
+                        domain=dev_alias,
+                        domain_type=DomainType.SUBDOMAIN,
+                        is_primary=False,
+                        is_verified=True,
+                        verification_token=f"mtn-dev-{uuid.uuid4().hex[:8]}",
+                        status=TenantStatus.ACTIVE
+                    )
 
             # 4. Create website branding settings
             WebsiteSettings.objects.create(

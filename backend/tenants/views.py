@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import status, permissions, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -15,6 +16,28 @@ from users.models import User, UserRole
 from notes.models import Note
 
 
+def extract_base_domain(host: str) -> str:
+    """
+    Extracts the root/base domain from a host string.
+    - 'prod.flowiq.in' -> 'flowiq.in'
+    - 'admin.flowiq.in' -> 'flowiq.in'
+    - 'localhost' / '127.0.0.1' -> 'localhost'
+    - 'sub.example.com' -> 'example.com'
+    """
+    if not host:
+        return 'localhost'
+    clean = host.split(':')[0].strip().lower()
+    if clean in ['localhost', '127.0.0.1', '::1'] or clean.endswith('.localhost'):
+        return 'localhost'
+    for prefix in ['prod.', 'app.', 'admin.', 'platform.', 'api.']:
+        if clean.startswith(prefix):
+            return clean[len(prefix):]
+    parts = clean.split('.')
+    if len(parts) > 2 and not clean.endswith('ngrok-free.dev'):
+        return '.'.join(parts[-2:])
+    return clean
+
+
 class TenantPublicView(APIView):
     """
     Public endpoint to resolve the tenant for the current domain.
@@ -24,12 +47,24 @@ class TenantPublicView(APIView):
 
     def get(self, request):
         tenant = getattr(request, 'tenant', None)
+        platform_domain = getattr(settings, 'PLATFORM_DOMAIN', 'prod.localhost')
+        configured_base_domain = getattr(settings, 'PLATFORM_BASE_DOMAIN', 'localhost')
+        detected_host = getattr(request, 'normalized_host', 'localhost')
+        detected_base_domain = extract_base_domain(detected_host)
+
+        # Prefer detected public base domain if accessing via real domain; otherwise use configured base domain
+        active_base_domain = detected_base_domain if detected_base_domain != 'localhost' else configured_base_domain
+
         if not tenant or getattr(tenant, 'schema_name', '') == 'public':
             # Request is on the platform domain
             return Response({
                 'is_platform': True,
                 'name': 'Multi-Tenant Note Taker SaaS Platform',
-                'domain': getattr(request, 'normalized_host', 'localhost')
+                'domain': detected_host,
+                'platform_domain': platform_domain,
+                'platform_base_domain': active_base_domain,
+                'configured_base_domain': configured_base_domain,
+                'detected_base_domain': detected_base_domain,
             })
 
         # Return tenant public details and branding settings
@@ -47,6 +82,8 @@ class TenantPublicView(APIView):
             'schema_name': tenant.schema_name,
             'status': tenant.status,
             'domain': primary_domain.domain if primary_domain else '',
+            'platform_domain': platform_domain,
+            'platform_base_domain': active_base_domain,
             'website_settings': settings_data
         })
 

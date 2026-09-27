@@ -112,6 +112,7 @@ DEBUG=False
 
 # Real production platform domain
 PLATFORM_DOMAIN=prod.yourplatform.com
+PLATFORM_BASE_DOMAIN=yourplatform.com
 
 # Allows dynamic multi-tenant custom domains (enforced by AppTenantMiddleware)
 ALLOWED_HOSTS=*
