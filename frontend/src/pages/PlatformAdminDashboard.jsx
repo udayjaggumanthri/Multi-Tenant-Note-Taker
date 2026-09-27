@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { formatDomainUrl } from '../utils/domain';
 import { Building2, Users, FileText, CheckCircle2, XCircle, Plus, ArrowRight, ExternalLink } from 'lucide-react';
 
 export default function PlatformAdminDashboard() {
@@ -154,7 +155,7 @@ export default function PlatformAdminDashboard() {
                     <td style={{ fontWeight: 600 }}>{t.name}</td>
                     <td className="mono" style={{ fontSize: '0.85rem' }}>
                       <a
-                        href={`http://${t.primary_domain}:${window.location.port || '5173'}`}
+                        href={formatDomainUrl(t.primary_domain)}
                         target="_blank"
                         rel="noreferrer"
                         style={{ color: '#60A5FA', display: 'inline-flex', alignItems: 'center', gap: '4px' }}

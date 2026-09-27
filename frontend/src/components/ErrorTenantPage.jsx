@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, ShieldAlert, RefreshCw, Home } from 'lucide-react';
 import { useTenant } from '../context/TenantContext';
+import { formatDomainUrl } from '../utils/domain';
 
 export default function ErrorTenantPage() {
   const { error, reloadTenant } = useTenant();
@@ -81,7 +82,7 @@ export default function ErrorTenantPage() {
           <button onClick={reloadTenant} className="btn btn-secondary">
             <RefreshCw size={15} /> Retry Resolution
           </button>
-          <a href={`http://prod.localhost:${window.location.port || '5173'}/admin/login`} className="btn btn-primary">
+          <a href={`${formatDomainUrl('prod.localhost')}/admin/login`} className="btn btn-primary">
             Platform Admin Portal
           </a>
         </div>

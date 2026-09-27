@@ -16,8 +16,9 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-dev-key-poc-multite
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
 # Host and Domain settings
+# AppTenantMiddleware enforces strict domain-existence checks and direct IP rejection.
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
-if not ALLOWED_HOSTS:
+if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
     ALLOWED_HOSTS = ['*']
 
 PLATFORM_DOMAIN = os.getenv('PLATFORM_DOMAIN', 'prod.localhost').strip().lower()

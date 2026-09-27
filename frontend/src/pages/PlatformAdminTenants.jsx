@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { formatDomainUrl } from '../utils/domain';
 import { Plus, Trash2, Power, ExternalLink, Globe, Database, Search, HelpCircle } from 'lucide-react';
 import DnsSetupModal from '../components/DnsSetupModal';
 
@@ -136,7 +137,7 @@ export default function PlatformAdminTenants() {
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
                         <a
-                          href={`http://${t.primary_domain}:${window.location.port || '5173'}`}
+                          href={formatDomainUrl(t.primary_domain)}
                           target="_blank"
                           rel="noreferrer"
                           className="mono"
