@@ -1,58 +1,66 @@
+from django.db.models import Q
 from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, PermissionDenied
 from notes.models import Note
 from notes.serializers import NoteSerializer
 from users.permissions import IsTenantMember
-from users.models import UserRole
 
 
 class NoteViewSet(viewsets.ModelViewSet):
     """
-    CRUD API for Notes with STRICT Tenant Isolation (Phase 17, 19).
-    Never exposes notes from other tenants.
-    Never relies on frontend-supplied tenant_id.
+    CRUD API for Notes with PHYSICAL PostgreSQL Schema Isolation (django-tenants).
+    
+    - PostgreSQL 'search_path' isolates tenant tables physically at database engine level.
+    - Zero cross-tenant data leaks.
+    - Includes search, category filters, pinning, and note export.
     """
     serializer_class = NoteSerializer
     permission_classes = [permissions.IsAuthenticated, IsTenantMember]
 
     def get_queryset(self):
         tenant = getattr(self.request, 'tenant', None)
-        if not tenant:
-            # No tenant resolved for this domain
+        if not tenant or tenant.schema_name == 'public':
             return Note.objects.none()
 
-        # Strict security rule: always filter by request.tenant.id
-        # Completely ignores any ?tenant_id query parameter
-        return Note.objects.filter(tenant_id=tenant.id).select_related('created_by').order_by('-created_at')
+        qs = Note.objects.select_related('created_by').all()
 
-    def get_object(self):
-        tenant = getattr(self.request, 'tenant', None)
-        if not tenant:
-            raise NotFound(detail="Tenant / domain not configured.")
+        # Search filter
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(Q(title__icontains=search) | Q(content__icontains=search) | Q(category__icontains=search))
 
-        # First find by PK
-        pk = self.kwargs.get('pk')
-        try:
-            note = Note.objects.select_related('created_by').get(pk=pk)
-        except Note.DoesNotExist:
-            raise NotFound(detail="Note not found.")
+        # Category filter
+        category = self.request.query_params.get('category', '').strip()
+        if category and category.lower() != 'all':
+            qs = qs.filter(category__iexact=category)
 
-        # Critical Isolation Check: ensure note belongs to current request.tenant
-        if note.tenant_id != tenant.id:
-            # Return 404 to avoid leaking existence of notes in other tenants
-            raise NotFound(detail="Note not found.")
-
-        self.check_object_permissions(self.request, note)
-        return note
+        return qs.order_by('-is_pinned', '-created_at')
 
     def perform_create(self, serializer):
         tenant = getattr(self.request, 'tenant', None)
-        if not tenant:
+        if not tenant or tenant.schema_name == 'public':
             raise PermissionDenied(detail="Cannot create note: no active tenant resolved for this domain.")
 
-        # Tenant and creator are enforced on backend, never from payload
-        serializer.save(
-            tenant=tenant,
-            created_by=self.request.user
-        )
+        # Note is saved directly into the tenant's physical schema
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'], url_path='toggle-pin')
+    def toggle_pin(self, request, pk=None):
+        note = self.get_object()
+        note.is_pinned = not note.is_pinned
+        note.save(update_fields=['is_pinned'])
+        return Response(NoteSerializer(note).data)
+
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        """Exports all notes for the current tenant in JSON format."""
+        notes = self.get_queryset()
+        data = NoteSerializer(notes, many=True).data
+        return Response({
+            'tenant': request.tenant.name,
+            'schema': request.tenant.schema_name,
+            'total_notes': len(data),
+            'notes': data
+        })

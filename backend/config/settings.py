@@ -22,8 +22,15 @@ if not ALLOWED_HOSTS:
 
 PLATFORM_DOMAIN = os.getenv('PLATFORM_DOMAIN', 'prod.localhost').strip().lower()
 
-# Application definition
-INSTALLED_APPS = [
+# ==============================================================================
+# DJANGO-TENANTS APPLICATION CONFIGURATION
+# ==============================================================================
+# Shared apps live in the PostgreSQL "public" schema (Platform & Core Services)
+SHARED_APPS = [
+    'django_tenants',  # Mandatory: must be the very first app
+
+    'tenants',         # Client and Domain models
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -31,25 +38,43 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # Third-party apps
+    # Third-party utilities
     'corsheaders',
     'rest_framework',
     'rest_framework.authtoken',
 
-    # Project apps
-    'tenants',
+    # Platform user accounts
     'users',
-    'notes',
 ]
 
+# Tenant apps live in dedicated PostgreSQL schemas per tenant (e.g., tenant_abc, tenant_xyz)
+TENANT_APPS = [
+    'django.contrib.contenttypes',
+    'django.contrib.auth',
+    'notes',           # Note tables physically isolated in each tenant's schema!
+]
+
+# All installed apps combined (django-tenants merges both)
+INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
+
+TENANT_MODEL = "tenants.Client"
+TENANT_DOMAIN_MODEL = "tenants.Domain"
+PUBLIC_SCHEMA_NAME = "public"
+
+# Database Router for multi-tenancy
+DATABASE_ROUTERS = (
+    'django_tenants.routers.TenantSyncRouter',
+)
+
+# Middleware Pipeline
 MIDDLEWARE = [
+    'tenants.middleware.AppTenantMiddleware',  # Mandatory: MUST be the first middleware!
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'tenants.middleware.TenantMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -73,23 +98,24 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database
-# Shared PostgreSQL database with tenant_id (Phase 4)
+# ==============================================================================
+# DATABASE CONFIGURATION (django-tenants PostgreSQL Backend)
+# ==============================================================================
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'django_tenants.postgresql_backend',
         'NAME': os.getenv('DATABASE_NAME', 'multitenant_notes'),
         'USER': os.getenv('DATABASE_USER', 'postgres'),
         'PASSWORD': os.getenv('DATABASE_PASSWORD', ''),
         'HOST': os.getenv('DATABASE_HOST', '127.0.0.1'),
         'PORT': os.getenv('DATABASE_PORT', '5432'),
+        'CONN_MAX_AGE': 60,
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
-# Custom User Model (Phase 6)
 AUTH_USER_MODEL = 'users.User'
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -106,19 +132,19 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework Configuration
+# ==============================================================================
+# REST FRAMEWORK & RATE LIMITING
+# ==============================================================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
@@ -127,7 +153,18 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/minute',
+        'user': '1000/minute',
+    }
 }
+
+# Reverse Proxy SSL Header
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True
@@ -145,7 +182,7 @@ CORS_ALLOW_HEADERS = [
     'x-tenant-domain',
 ]
 
-# Logging Configuration (Phase 41)
+# Logging Configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

@@ -152,13 +152,23 @@ def run_tests():
     assert "ABC Secret Note" not in xyz_titles, f"LEAKAGE DETECTED! ABC note appeared in XYZ list: {xyz_titles}"
     print(f"  [OK] SUCCESS: XYZ Notes: {xyz_titles} (Zero ABC notes present)")
 
-    # 8. Note Detail Access Isolation (Phase 19, 27)
+    # 8. Note Detail Access Isolation (Physical Schema Isolation)
     print("\n[TEST 8] Direct Note Access Isolation via GET /api/notes/<id>/")
     xyz_note_id = [n["id"] for n in xyz_notes if n["title"] == "XYZ Secret Note"][0]
     # Ravi on abc.localhost attempts to view xyz_note_id
     status, data = make_request(f"/api/notes/{xyz_note_id}/", host="abc.localhost", token=ravi_token)
-    assert status == 404, f"SECURITY FAILURE! Expected 404, got {status}: {data}"
-    print(f"  [OK] SUCCESS: Ravi on abc.localhost received 404 when requesting XYZ Note #{xyz_note_id}")
+    # With physical schema isolation, tables are separated. Even if serial IDs overlap, XYZ note content never leaks to ABC
+    if status == 200:
+        assert data.get("title") != "XYZ Secret Note", f"DATA LEAKAGE! XYZ Secret Note was exposed on abc.localhost: {data}"
+        print(f"  [OK] SUCCESS: Request to note ID #{xyz_note_id} on abc.localhost returned tenant ABC's own note '{data.get('title')}', zero XYZ data exposure")
+    else:
+        assert status == 404, f"Expected 404 or ABC note, got {status}: {data}"
+        print(f"  [OK] SUCCESS: Ravi on abc.localhost received 404 when requesting XYZ Note #{xyz_note_id}")
+
+    # Accessing non-existent note in tenant schema returns 404
+    status_404, _ = make_request("/api/notes/99999/", host="abc.localhost", token=ravi_token)
+    assert status_404 == 404, f"Expected 404 for non-existent note, got {status_404}"
+    print("  [OK] SUCCESS: Non-existent note ID in tenant schema returns HTTP 404 Not Found")
 
     # 9. Tenant ID Parameter Manipulation Prevention (Phase 17)
     print("\n[TEST 9] Tamper-Resistant Tenant ID in Note Creation")

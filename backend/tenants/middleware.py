@@ -2,7 +2,8 @@ import ipaddress
 import logging
 from django.conf import settings
 from django.http import JsonResponse
-from tenants.models import CustomDomain, TenantStatus
+from django_tenants.middleware.main import TenantMainMiddleware
+from tenants.models import TenantStatus
 
 logger = logging.getLogger('tenant')
 
@@ -20,58 +21,48 @@ def is_ip_address(host: str) -> bool:
 
 def normalize_hostname(host_header: str) -> str:
     """
-    Normalizes incoming hostnames according to Phase 14:
+    Normalizes incoming hostnames:
     - Removes port numbers (e.g., abc.localhost:8000 -> abc.localhost)
-    - Removes unnecessary trailing dots (e.g., abc.localhost. -> abc.localhost)
-    - Lowercases everything (e.g., ABC.LOCALHOST -> abc.localhost)
+    - Removes unnecessary trailing dots
+    - Lowercases everything
     """
     if not host_header:
         return ''
-    # Strip port if present
     host = host_header.split(':')[0]
-    # Strip trailing dots
     host = host.rstrip('.')
-    # Convert to lowercase
     return host.strip().lower()
 
 
-class TenantMiddleware:
+class AppTenantMiddleware(TenantMainMiddleware):
     """
-    Resolves tenant based on incoming domain/Host header.
-    Attaches request.tenant and request.custom_domain.
+    Production-grade Multi-Tenant middleware powered by django-tenants.
+    
+    1. Direct IP Access Blocker: Rejects direct public IP visits with 403 Forbidden.
+    2. Dynamic Schema Router: Switches PostgreSQL search_path to the tenant's dedicated schema.
+    3. Inactive Account Guard: Blocks disabled organizations with 403 Forbidden.
+    4. Rogue Domain Guard: Unrecognized domain host headers return 404 Not Found.
     """
-    def __init__(self, get_response):
-        self.get_response = get_response
 
-    def __call__(self, request):
-        # 1. Allow CORS preflight requests to pass through
-        if request.method == 'OPTIONS':
-            request.tenant = None
-            request.custom_domain = None
-            return self.get_response(request)
-
-        # 2. Extract and normalize hostname
-        raw_host = request.get_host()
-        hostname = normalize_hostname(raw_host)
-
+    def hostname_from_request(self, request):
         # Allow header override for testing if in DEBUG mode
         if settings.DEBUG and 'HTTP_X_TENANT_DOMAIN' in request.META:
             override_domain = request.META['HTTP_X_TENANT_DOMAIN']
             if override_domain:
-                hostname = normalize_hostname(override_domain)
+                return normalize_hostname(override_domain)
+        raw_host = request.get_host()
+        return normalize_hostname(raw_host)
 
-        request.tenant = None
-        request.custom_domain = None
-        request.normalized_host = hostname
+    def process_request(self, request):
+        # 1. Allow CORS preflight requests
+        if request.method == 'OPTIONS':
+            request.tenant = None
+            return None
 
+        # 2. Extract and normalize hostname
+        hostname = self.hostname_from_request(request)
         path = request.path
 
-        # -------------------------------------------------------------
-        # SECURITY LAYER 1: DIRECT IP ACCESS PREVENTION
-        # -------------------------------------------------------------
-        # Direct IP access (e.g. http://203.0.113.10/ or external IPs) is prohibited.
-        # This prevents port scanners, bots, and attackers from accessing the application
-        # or probing endpoints directly without an authorized domain name.
+        # 3. Direct IP Access Prevention (Layer 2 Security)
         if is_ip_address(hostname):
             # Allow loopback (127.0.0.1) ONLY for local development when DEBUG=True
             if not (settings.DEBUG and hostname in ['127.0.0.1', '::1']):
@@ -82,59 +73,31 @@ class TenantMiddleware:
                     'host': hostname
                 }, status=403)
 
-        # Platform domain configuration
-        platform_domain = getattr(settings, 'PLATFORM_DOMAIN', 'prod.localhost').lower()
-        is_platform_host = (hostname == platform_domain or (settings.DEBUG and hostname in ['localhost', '127.0.0.1']))
-
-        # Allow Django admin and platform admin APIs on platform domain or localhost
-        if is_platform_host:
-            logger.info(f"Incoming Host: {hostname} | Platform Host | Request: {request.method} {path}")
-            # Platform host does not have a tenant attached
-            response = self.get_response(request)
+        # 4. Delegate to django-tenants for schema resolution and search_path switching
+        response = super().process_request(request)
+        if response:
             return response
 
-        # 3. Lookup domain in custom_domains table
-        try:
-            domain_obj = CustomDomain.objects.select_related('tenant').filter(domain=hostname).first()
-        except Exception as e:
-            logger.error(f"Error querying custom_domains for host {hostname}: {e}")
-            return JsonResponse({'error': 'Database error during tenant resolution.'}, status=500)
+        # 5. Inactive Tenant Guard
+        tenant = getattr(request, 'tenant', None)
+        if tenant and tenant.schema_name != 'public':
+            if getattr(tenant, 'status', None) == TenantStatus.INACTIVE:
+                logger.warning(f"Incoming Host: {hostname} | Inactive Tenant: {tenant.id} ({tenant.name}) | Path: {path}")
+                return JsonResponse({
+                    'error': 'Tenant account is currently inactive.',
+                    'code': 'TENANT_INACTIVE',
+                    'tenant_id': tenant.id,
+                    'tenant_name': tenant.name
+                }, status=403)
 
-        # 4. Unknown domain handling (Phase 15)
-        if not domain_obj:
-            logger.warning(f"Incoming Host: {hostname} | Unknown Domain | Request: {request.method} {path}")
-            return JsonResponse({
-                'error': 'Tenant / domain not configured.',
-                'code': 'TENANT_NOT_FOUND',
-                'host': hostname
-            }, status=404)
+        request.normalized_host = hostname
+        logger.info(f"Incoming Host: {hostname} | Schema: {getattr(tenant, 'schema_name', 'none')} | Tenant: {getattr(tenant, 'name', 'Platform')} | Request: {request.method} {path}")
+        return None
 
-        # 5. Inactive domain check
-        if domain_obj.status == TenantStatus.INACTIVE:
-            logger.warning(f"Incoming Host: {hostname} | Inactive Domain | Request: {request.method} {path}")
-            return JsonResponse({
-                'error': 'This domain is currently inactive.',
-                'code': 'DOMAIN_INACTIVE',
-                'host': hostname
-            }, status=403)
-
-        tenant = domain_obj.tenant
-
-        # 6. Inactive tenant handling (Phase 16)
-        if tenant.status == TenantStatus.INACTIVE:
-            logger.warning(f"Incoming Host: {hostname} | Inactive Tenant: {tenant.id} ({tenant.name}) | Request: {request.method} {path}")
-            return JsonResponse({
-                'error': 'Tenant account is currently inactive.',
-                'code': 'TENANT_INACTIVE',
-                'tenant_id': tenant.id,
-                'tenant_name': tenant.name
-            }, status=403)
-
-        # 7. Attach tenant and domain to request
-        request.tenant = tenant
-        request.custom_domain = domain_obj
-
-        logger.info(f"Incoming Host: {hostname} | Resolved Tenant: {tenant.id} ({tenant.name}) | Request: {request.method} {path}")
-
-        response = self.get_response(request)
-        return response
+    def no_tenant_found(self, request, hostname):
+        logger.warning(f"Incoming Host: {hostname} | Unknown Domain | Request: {request.method} {request.path}")
+        return JsonResponse({
+            'error': 'Tenant / domain not configured.',
+            'code': 'TENANT_NOT_FOUND',
+            'host': hostname
+        }, status=404)

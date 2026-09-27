@@ -16,17 +16,6 @@ export default function TenantLogin() {
 
   const tenantName = tenant?.website_settings?.company_name || tenant?.name || 'Tenant';
 
-  // Demo credential autofill helper
-  const handleQuickFill = () => {
-    if (tenant?.id === 101) {
-      setEmail('ravi@abc.com');
-      setPassword('RaviPass@123');
-    } else if (tenant?.id === 102) {
-      setEmail('john@xyz.com');
-      setPassword('JohnPass@123');
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -119,22 +108,6 @@ export default function TenantLogin() {
           </button>
         </form>
 
-        {/* Quick autofill helper for local demonstration */}
-        <div style={{
-          marginTop: '1.75rem',
-          paddingTop: '1.25rem',
-          borderTop: '1px solid var(--border-color)',
-          textAlign: 'center'
-        }}>
-          <button
-            type="button"
-            onClick={handleQuickFill}
-            className="btn btn-secondary btn-sm"
-            style={{ width: '100%', fontSize: '0.775rem' }}
-          >
-            <ShieldCheck size={14} color="#10B981" /> Auto-fill Demo Credentials ({tenant?.id === 101 ? 'Ravi' : tenant?.id === 102 ? 'John' : 'Demo'})
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -2,7 +2,8 @@ from rest_framework import status, permissions, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from tenants.models import Tenant, CustomDomain, WebsiteSettings, TenantStatus
+from django_tenants.utils import schema_context
+from tenants.models import Client, Domain, WebsiteSettings, TenantStatus
 from tenants.serializers import (
     TenantSerializer,
     CreateTenantSerializer,
@@ -10,21 +11,20 @@ from tenants.serializers import (
     CustomDomainSerializer
 )
 from users.permissions import IsPlatformAdmin, IsTenantAdminOrPlatformAdmin
+from users.models import User, UserRole
 from notes.models import Note
 
 
 class TenantPublicView(APIView):
     """
     Public endpoint to resolve the tenant for the current domain.
-    Used by the React frontend on initial page load (Phase 24).
+    Used by the React frontend on initial page load.
     """
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
         tenant = getattr(request, 'tenant', None)
-        domain_obj = getattr(request, 'custom_domain', None)
-
-        if not tenant:
+        if not tenant or getattr(tenant, 'schema_name', '') == 'public':
             # Request is on the platform domain
             return Response({
                 'is_platform': True,
@@ -37,20 +37,23 @@ class TenantPublicView(APIView):
         if hasattr(tenant, 'website_settings'):
             settings_data = WebsiteSettingsSerializer(tenant.website_settings).data
 
+        primary_domain = tenant.domains.filter(is_primary=True).first()
+
         return Response({
             'is_platform': False,
             'id': tenant.id,
             'name': tenant.name,
             'slug': tenant.slug,
+            'schema_name': tenant.schema_name,
             'status': tenant.status,
-            'domain': domain_obj.domain if domain_obj else '',
+            'domain': primary_domain.domain if primary_domain else '',
             'website_settings': settings_data
         })
 
 
 class WebsiteSettingsView(APIView):
     """
-    Tenant website branding and settings endpoint (Phase 9).
+    Tenant website branding and settings endpoint.
     GET: Public
     PUT/PATCH: Tenant Admin or Platform Admin
     """
@@ -61,7 +64,7 @@ class WebsiteSettingsView(APIView):
 
     def get(self, request):
         tenant = getattr(request, 'tenant', None)
-        if not tenant:
+        if not tenant or tenant.schema_name == 'public':
             return Response({'error': 'No tenant domain resolved.'}, status=status.HTTP_400_BAD_REQUEST)
 
         settings_obj, _ = WebsiteSettings.objects.get_or_create(
@@ -72,7 +75,7 @@ class WebsiteSettingsView(APIView):
 
     def put(self, request):
         tenant = getattr(request, 'tenant', None)
-        if not tenant:
+        if not tenant or tenant.schema_name == 'public':
             return Response({'error': 'No tenant domain resolved.'}, status=status.HTTP_400_BAD_REQUEST)
 
         settings_obj, _ = WebsiteSettings.objects.get_or_create(
@@ -87,11 +90,10 @@ class WebsiteSettingsView(APIView):
 
 class PlatformAdminTenantViewSet(viewsets.ModelViewSet):
     """
-    Platform Admin endpoint for managing tenants (Phase 10, 11).
-    Allows creating, viewing, updating status, and deleting tenants.
+    Platform Admin endpoint for managing tenants with django-tenants schemas.
     """
     permission_classes = [IsPlatformAdmin]
-    queryset = Tenant.objects.all().prefetch_related('domains', 'website_settings', 'notes').order_by('id')
+    queryset = Client.objects.exclude(schema_name='public').prefetch_related('domains', 'website_settings').order_by('id')
     serializer_class = TenantSerializer
 
     def create(self, request, *args, **kwargs):
@@ -103,7 +105,6 @@ class PlatformAdminTenantViewSet(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
-        # Allow updating status, name, etc.
         status_val = request.data.get('status')
         if status_val and status_val in TenantStatus.values:
             instance.status = status_val
@@ -116,15 +117,23 @@ class PlatformAdminTenantViewSet(viewsets.ModelViewSet):
 
 class PlatformAdminStatsView(APIView):
     """
-    Platform Admin dashboard metrics (Phase 10).
+    Platform Admin dashboard metrics aggregated across all tenant schemas.
     """
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request):
-        total_tenants = Tenant.objects.count()
-        active_tenants = Tenant.objects.filter(status=TenantStatus.ACTIVE).count()
-        inactive_tenants = Tenant.objects.filter(status=TenantStatus.INACTIVE).count()
-        total_notes = Note.objects.count()
+        clients = Client.objects.exclude(schema_name='public')
+        total_tenants = clients.count()
+        active_tenants = clients.filter(status=TenantStatus.ACTIVE).count()
+        inactive_tenants = clients.filter(status=TenantStatus.INACTIVE).count()
+
+        total_notes = 0
+        for client in clients:
+            try:
+                with schema_context(client.schema_name):
+                    total_notes += Note.objects.count()
+            except Exception:
+                pass
 
         return Response({
             'total_tenants': total_tenants,
@@ -137,16 +146,14 @@ class PlatformAdminStatsView(APIView):
 class VerifyDomainView(APIView):
     """
     Checks real-time DNS propagation for a domain and verifies configuration.
-    Performs DNS resolution (socket.gethostbyname) and marks the domain as verified.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, domain_id):
         import socket
-        domain_obj = get_object_or_404(CustomDomain, id=domain_id)
+        domain_obj = get_object_or_404(Domain, id=domain_id)
 
         user = request.user
-        # Allow Platform Admin or Tenant Admin of the owning tenant
         if not (getattr(user, 'role', None) == 'PLATFORM_ADMIN' or (getattr(user, 'role', None) == 'TENANT_ADMIN' and user.tenant_id == domain_obj.tenant_id)):
             return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -180,3 +187,27 @@ class VerifyDomainView(APIView):
                 'resolved_ip': None,
                 'message': f"DNS record not found for '{domain_name}'. Please ensure your CNAME or A-record has propagated."
             }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class HealthCheckView(APIView):
+    """
+    Uptime and health monitoring endpoint for VPS and load balancers.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from django.db import connection
+        db_healthy = True
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT 1;')
+        except Exception:
+            db_healthy = False
+
+        status_code = status.HTTP_200_OK if db_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
+        return Response({
+            'status': 'healthy' if db_healthy else 'unhealthy',
+            'database': 'connected' if db_healthy else 'disconnected',
+            'multi_tenancy': 'django-tenants (PostgreSQL Schemas)',
+            'schemas_active': Client.objects.count() if db_healthy else 0
+        }, status=status_code)

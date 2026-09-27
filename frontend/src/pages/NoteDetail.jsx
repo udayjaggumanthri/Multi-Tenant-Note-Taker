@@ -13,6 +13,8 @@ export default function NoteDetail() {
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [category, setCategory] = useState('General');
+  const [isPinned, setIsPinned] = useState(false);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -25,6 +27,8 @@ export default function NoteDetail() {
           const data = await api.getNote(id);
           setTitle(data.title);
           setContent(data.content);
+          setCategory(data.category || 'General');
+          setIsPinned(Boolean(data.is_pinned));
         } catch (err) {
           console.error('Failed to load note:', err);
           setError(err.message || 'Note not found or inaccessible for this tenant.');
@@ -42,10 +46,11 @@ export default function NoteDetail() {
     setError(null);
 
     try {
+      const payload = { title, content, category, is_pinned: isPinned };
       if (isEditing) {
-        await api.updateNote(id, { title, content });
+        await api.updateNote(id, payload);
       } else {
-        await api.createNote({ title, content });
+        await api.createNote(payload);
       }
       navigate('/notes');
     } catch (err) {
@@ -117,6 +122,30 @@ export default function NoteDetail() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div>
+              <label className="form-label">Category / Tag</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. Operations, R&D, Strategy"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', paddingTop: '1.6rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.9rem', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={isPinned}
+                  onChange={(e) => setIsPinned(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--tenant-primary)' }}
+                />
+                <span style={{ fontWeight: 600 }}>Pin note to top of workspace</span>
+              </label>
+            </div>
           </div>
 
           <div className="form-group">

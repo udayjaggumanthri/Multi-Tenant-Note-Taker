@@ -12,11 +12,6 @@ export default function PlatformAdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleQuickFill = () => {
-    setEmail('admin@prod.com');
-    setPassword('AdminPass@123');
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -107,21 +102,6 @@ export default function PlatformAdminLogin() {
           </button>
         </form>
 
-        <div style={{
-          marginTop: '1.75rem',
-          paddingTop: '1.25rem',
-          borderTop: '1px solid var(--border-color)',
-          textAlign: 'center'
-        }}>
-          <button
-            type="button"
-            onClick={handleQuickFill}
-            className="btn btn-secondary btn-sm"
-            style={{ width: '100%', fontSize: '0.775rem' }}
-          >
-            <KeyRound size={14} color="#A78BFA" /> Auto-fill Platform Admin (admin@prod.com)
-          </button>
-        </div>
       </div>
     </div>
   );

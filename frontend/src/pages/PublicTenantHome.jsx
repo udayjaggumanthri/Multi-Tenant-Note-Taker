@@ -48,12 +48,19 @@ export default function PublicTenantHome() {
             <Link to="/admin/login" className="btn btn-primary" style={{ padding: '0.75rem 1.75rem', fontSize: '1rem' }}>
               Platform Admin Console <ArrowRight size={18} />
             </Link>
-            <a href="http://abc.localhost:5173" className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem' }}>
-              Launch ABC Electronics
-            </a>
-            <a href="http://xyz.localhost:5173" className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem' }}>
-              Launch XYZ Furniture
-            </a>
+            <Link to="/dns-guide" className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem' }}>
+              <Globe size={16} /> DNS & Deployment Guide
+            </Link>
+            {import.meta.env.DEV && (
+              <>
+                <a href="http://abc.localhost:5173" className="btn btn-secondary" style={{ padding: '0.75rem 1.25rem', fontSize: '0.85rem' }}>
+                  Demo: ABC Electronics
+                </a>
+                <a href="http://xyz.localhost:5173" className="btn btn-secondary" style={{ padding: '0.75rem 1.25rem', fontSize: '0.85rem' }}>
+                  Demo: XYZ Furniture
+                </a>
+              </>
+            )}
           </div>
         </div>
 
@@ -69,9 +76,9 @@ export default function PublicTenantHome() {
 
           <div className="card">
             <Database color="#34D399" size={28} style={{ marginBottom: '1rem' }} />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Strict Data Isolation</h3>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Physical Schema Isolation</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.5 }}>
-              PostgreSQL shared database with row-level boundary enforcement. Zero cross-tenant data exposure.
+              PostgreSQL schema-per-tenant isolation via django-tenants. Complete table-level separation and zero cross-tenant data exposure.
             </p>
           </div>
 
@@ -168,9 +175,9 @@ export default function PublicTenantHome() {
             </div>
           </div>
           <div>
-            <span style={{ color: 'var(--text-muted)' }}>Data Isolation:</span>
+            <span style={{ color: 'var(--text-muted)' }}>Schema Isolation:</span>
             <div style={{ fontWeight: 600, color: '#10B981', marginTop: '2px' }}>
-              Active (tenant_id = {tenant?.id})
+              Dedicated ({tenant?.schema_name || ('tenant_' + tenant?.slug)})
             </div>
           </div>
         </div>

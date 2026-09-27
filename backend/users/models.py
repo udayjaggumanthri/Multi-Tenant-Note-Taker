@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 
@@ -5,6 +6,7 @@ from django.db import models
 class UserRole(models.TextChoices):
     PLATFORM_ADMIN = 'PLATFORM_ADMIN', 'Platform Admin'
     TENANT_ADMIN = 'TENANT_ADMIN', 'Tenant Admin'
+    MEMBER = 'MEMBER', 'Team Member'
 
 
 class CustomUserManager(BaseUserManager):
@@ -41,7 +43,7 @@ class CustomUserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     tenant = models.ForeignKey(
-        'tenants.Tenant',
+        settings.TENANT_MODEL,
         on_delete=models.CASCADE,
         null=True,
         blank=True,

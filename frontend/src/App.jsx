@@ -79,7 +79,7 @@ function AppContent() {
         <main className="main-content">
           <ErrorTenantPage />
         </main>
-        <DomainSwitcherDemo />
+        {import.meta.env.DEV && <DomainSwitcherDemo />}
       </div>
     );
   }
@@ -175,8 +175,8 @@ function AppContent() {
         </Routes>
       </main>
 
-      {/* Floating Quick Domain Switcher for local demo & testing */}
-      <DomainSwitcherDemo />
+      {/* Floating Quick Domain Switcher for local development only */}
+      {import.meta.env.DEV && <DomainSwitcherDemo />}
     </div>
   );
 }
