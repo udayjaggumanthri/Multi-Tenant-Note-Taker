@@ -164,8 +164,10 @@ REST_FRAMEWORK = {
     }
 }
 
-# Reverse Proxy SSL Header
+# Reverse Proxy SSL & Host Headers
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True

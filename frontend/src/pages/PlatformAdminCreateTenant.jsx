@@ -18,15 +18,24 @@ export default function PlatformAdminCreateTenant() {
   const [customDomainInput, setCustomDomainInput] = useState('');
   const [isDnsModalOpen, setIsDnsModalOpen] = useState(false);
   
-  // Database Strategy: SHARED_DB vs ISOLATED_SCHEMA vs SEPARATE_DB
-  const [dbStrategy, setDbStrategy] = useState('SHARED_DB');
+  // Database Strategy: ISOLATED_SCHEMA (django-tenants default)
+  const [dbStrategy, setDbStrategy] = useState('ISOLATED_SCHEMA');
   
   const [primaryColor, setPrimaryColor] = useState('#2563EB');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  // Derive subdomain automatically from slug
-  const platformBaseDomain = window.location.hostname.includes('localhost') ? 'localhost' : 'prod.com';
+  // Derive subdomain automatically from slug without fake prod.com
+  const getPlatformBaseDomain = () => {
+    const host = window.location.hostname.toLowerCase();
+    if (host.includes('localhost') || host.includes('ngrok') || host === '127.0.0.1') {
+      return 'localhost';
+    }
+    // Real production domain (strip 'prod.' prefix if present)
+    return host.replace(/^prod\./i, '');
+  };
+
+  const platformBaseDomain = getPlatformBaseDomain();
   const autoSubdomain = slug ? `${slug}.${platformBaseDomain}` : '';
   const finalDomain = domainMode === 'SUBDOMAIN' ? autoSubdomain : customDomainInput.trim().toLowerCase();
 

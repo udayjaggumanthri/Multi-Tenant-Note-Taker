@@ -104,7 +104,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 # Run migrations, collectstatic & seed initial data
-python manage.py migrate
+python manage.py migrate_schemas
 python manage.py collectstatic --noinput
 python manage.py seed_data
 mkdir -p "$PROJECT_DIR/logs"

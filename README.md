@@ -46,6 +46,7 @@ This repository is organized into dedicated, comprehensive manuals:
 
 | Document | Scope | Target Audience |
 | :--- | :--- | :--- |
+| 🏛️ **[Architecture Manual](ARCHITECTURE.md)** | Complete system blueprints, PostgreSQL schema isolation, request lifecycle, 6-layer defense | Software Architects & Engineers |
 | 🌐 **[DNS & Custom Domains Manual](docs/DNS_AND_DOMAINS.md)** | Step-by-step domain setup (Cloudflare, GoDaddy, Namecheap), A/CNAME records, Wildcard DNS, Let's Encrypt SSL, IP protection | Customers, Workspace Admins & DevOps |
 | ⚙️ **[Backend Manual](backend/README.md)** | `django-tenants` schema design, `SHARED_APPS` vs `TENANT_APPS`, security middleware, API catalog, test suite | Backend Engineers |
 | 🎨 **[Frontend Manual](frontend/README.md)** | React 19 + Vite, dynamic CSS token design system, context providers, routes, production build | Frontend Engineers |

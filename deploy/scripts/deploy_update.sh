@@ -23,7 +23,7 @@ echo -e "${BLUE}>>> Updating Python dependencies and running migrations...${NC}"
 cd "$PROJECT_DIR/backend"
 source venv/bin/activate
 pip install -r requirements.txt
-python manage.py migrate
+python manage.py migrate_schemas
 python manage.py collectstatic --noinput
 
 echo -e "${BLUE}>>> Building React frontend...${NC}"
