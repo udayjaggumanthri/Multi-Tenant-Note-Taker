@@ -105,6 +105,11 @@ export default function PlatformAdminCreateTenant() {
         setSaving(false);
         return;
       }
+      if (cleanBaseDomain.includes('ngrok')) {
+        setError('Multi-level subdomains on free ngrok tunnels are blocked by SSL (NET::ERR_CERT_COMMON_NAME_INVALID). Please use your production domain (e.g. flowiq.in) or localhost.');
+        setSaving(false);
+        return;
+      }
     } else if (domainMode === 'CUSTOM') {
       if (!cleanCustomDomain) {
         setError('Please provide a valid custom domain (e.g. company.com).');
@@ -193,6 +198,26 @@ export default function PlatformAdminCreateTenant() {
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', marginBottom: '1.25rem' }}>
               Select whether this tenant accesses the platform through a managed platform subdomain or their own branded apex domain.
             </p>
+
+            {window.location.hostname.includes('ngrok') && (
+              <div style={{
+                padding: '0.75rem 1rem',
+                background: 'rgba(234, 179, 8, 0.1)',
+                border: '1px solid rgba(234, 179, 8, 0.3)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.6rem',
+                fontSize: '0.8rem',
+                color: '#FDE047'
+              }}>
+                <Info size={16} style={{ flexShrink: 0, marginTop: '2px', color: '#FACC15' }} />
+                <div style={{ lineHeight: 1.45 }}>
+                  <strong>Testing on ngrok:</strong> Free ngrok certificates only cover single-level tunnels (<code>*.ngrok-free.dev</code>). Multi-level subdomains (e.g. <code>hi.{window.location.hostname}</code>) will trigger browser SSL errors (<code>NET::ERR_CERT_COMMON_NAME_INVALID</code>). Please select your production domain (e.g. <code>flowiq.in</code>) or <code>localhost</code> for local development.
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
               {/* Option A: Platform Subdomain */}

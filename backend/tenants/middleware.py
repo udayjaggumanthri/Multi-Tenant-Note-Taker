@@ -44,11 +44,24 @@ class AppTenantMiddleware(TenantMainMiddleware):
     """
 
     def hostname_from_request(self, request):
-        # Allow header override for testing if in DEBUG mode
-        if settings.DEBUG and 'HTTP_X_TENANT_DOMAIN' in request.META:
-            override_domain = request.META['HTTP_X_TENANT_DOMAIN']
+        # Allow header or query parameter override for testing if in DEBUG mode
+        if settings.DEBUG:
+            override_domain = request.META.get('HTTP_X_TENANT_DOMAIN')
             if override_domain:
                 return normalize_hostname(override_domain)
+            tenant_param = request.GET.get('tenant') or request.GET.get('domain')
+            if tenant_param:
+                tenant_param = tenant_param.strip().lower()
+                if '.' not in tenant_param:
+                    from tenants.models import Domain
+                    dev_domain = f"{tenant_param}.localhost"
+                    if Domain.objects.filter(domain=dev_domain).exists():
+                        return dev_domain
+                    pdomain = f"{tenant_param}.{getattr(settings, 'PLATFORM_BASE_DOMAIN', 'flowiq.in')}"
+                    if Domain.objects.filter(domain=pdomain).exists():
+                        return pdomain
+                return normalize_hostname(tenant_param)
+
         raw_host = request.get_host()
         return normalize_hostname(raw_host)
 

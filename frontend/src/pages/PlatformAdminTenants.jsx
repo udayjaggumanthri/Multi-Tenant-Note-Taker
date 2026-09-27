@@ -137,7 +137,7 @@ export default function PlatformAdminTenants() {
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
                         <a
-                          href={formatDomainUrl(t.primary_domain)}
+                          href={formatDomainUrl(t.primary_domain, t.slug)}
                           target="_blank"
                           rel="noreferrer"
                           className="mono"
@@ -146,6 +146,32 @@ export default function PlatformAdminTenants() {
                           {t.primary_domain} <ExternalLink size={11} />
                         </a>
                       </div>
+                      {window.location.hostname.includes('ngrok') && (
+                        <div style={{ marginTop: '0.2rem' }}>
+                          <a
+                            href={`${window.location.origin}/?tenant=${t.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mono"
+                            style={{ color: '#A78BFA', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                          >
+                            ⚡ Test on Tunnel: ?tenant={t.slug} <ExternalLink size={10} />
+                          </a>
+                        </div>
+                      )}
+                      {(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && t.slug && (
+                        <div style={{ marginTop: '0.2rem' }}>
+                          <a
+                            href={`http://${t.slug}.localhost:5173`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mono"
+                            style={{ color: '#34D399', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                          >
+                            💻 Local Dev: {t.slug}.localhost:5173 <ExternalLink size={10} />
+                          </a>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', marginTop: '0.25rem' }}>
                         <span className="badge" style={{
                           fontSize: '0.675rem',

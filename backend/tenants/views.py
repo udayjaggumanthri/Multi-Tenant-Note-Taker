@@ -32,8 +32,12 @@ def extract_base_domain(host: str) -> str:
     for prefix in ['prod.', 'app.', 'admin.', 'platform.', 'api.']:
         if clean.startswith(prefix):
             return clean[len(prefix):]
+    if 'ngrok' in clean:
+        # Ngrok free tunnels do not support nested subdomains (*.*.ngrok-free.dev)
+        # Always fallback to the configured platform base domain (e.g. flowiq.in or localhost)
+        return getattr(settings, 'PLATFORM_BASE_DOMAIN', 'flowiq.in')
     parts = clean.split('.')
-    if len(parts) > 2 and not clean.endswith('ngrok-free.dev'):
+    if len(parts) > 2:
         return '.'.join(parts[-2:])
     return clean
 

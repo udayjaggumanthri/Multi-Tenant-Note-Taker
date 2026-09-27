@@ -5,10 +5,18 @@ const API_BASE = '/api';
 
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('token');
+  const urlParams = new URLSearchParams(window.location.search);
+  const tenantOverride = urlParams.get('tenant') || urlParams.get('domain');
+
+  let tenantDomain = window.location.hostname;
+  if (tenantOverride) {
+    tenantDomain = tenantOverride.includes('.') ? tenantOverride : `${tenantOverride}.localhost`;
+  }
+
   const headers = {
     'Content-Type': 'application/json',
-    // Always pass browser's hostname to support domain resolution
-    'X-Tenant-Domain': window.location.hostname,
+    // Pass resolved tenant domain or browser hostname
+    'X-Tenant-Domain': tenantDomain,
     ...(options.headers || {})
   };
 
