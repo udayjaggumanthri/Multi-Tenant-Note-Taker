@@ -137,12 +137,24 @@ class CreateTenantSerializer(serializers.Serializer):
 
             # 3. Create domain mapping
             verification_token = f"mtn-{uuid.uuid4().hex[:12]}"
+            is_domain_verified = (domain_type == DomainType.SUBDOMAIN)
+            if not is_domain_verified:
+                try:
+                    import socket
+                    from django.conf import settings
+                    resolved_ip = socket.gethostbyname(domain_name)
+                    server_ip = getattr(settings, 'SERVER_PUBLIC_IP', '139.99.47.143')
+                    if resolved_ip == server_ip:
+                        is_domain_verified = True
+                except Exception:
+                    pass
+
             Domain.objects.create(
                 tenant=tenant,
                 domain=domain_name,
                 domain_type=domain_type,
                 is_primary=True,
-                is_verified=True if domain_type == DomainType.SUBDOMAIN else False,
+                is_verified=is_domain_verified,
                 verification_token=verification_token,
                 status=TenantStatus.ACTIVE
             )

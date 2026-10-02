@@ -9,11 +9,17 @@ export function TenantProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [platformDomain, setPlatformDomain] = useState('flowiq.in');
+  const [serverIp, setServerIp] = useState('139.99.47.143');
+
   const fetchTenant = async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await api.getTenant();
+      if (data.platform_domain) setPlatformDomain(data.platform_domain);
+      if (data.server_ip) setServerIp(data.server_ip);
+
       if (data.is_platform) {
         setIsPlatform(true);
         setTenant(null);
@@ -43,7 +49,15 @@ export function TenantProvider({ children }) {
   }, []);
 
   return (
-    <TenantContext.Provider value={{ tenant, isPlatform, loading, error, reloadTenant: fetchTenant }}>
+    <TenantContext.Provider value={{
+      tenant,
+      isPlatform,
+      loading,
+      error,
+      reloadTenant: fetchTenant,
+      platformDomain,
+      serverIp
+    }}>
       {children}
     </TenantContext.Provider>
   );

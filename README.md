@@ -2,6 +2,8 @@
 
 A production-ready Multi-Tenant SaaS document management platform featuring physical PostgreSQL schema-per-tenant data isolation via **`django-tenants`**, dynamic custom domain routing, runtime brand theming, and an enterprise administration console.
 
+> 📘 **Looking for a beginner-friendly system overview?** Read the [Complete System Architecture & Flow Guide](SYSTEM_ARCHITECTURE_FLOW.md).
+
 ---
 
 ## 🏗 Architecture Blueprint

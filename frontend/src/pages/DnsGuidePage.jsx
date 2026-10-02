@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Globe, ArrowLeft, Copy, Check, Server, ShieldCheck, HelpCircle, Layers, CheckCircle2 } from 'lucide-react';
+import { useTenant } from '../context/TenantContext';
 
 export default function DnsGuidePage() {
   const [copiedKey, setCopiedKey] = useState(null);
+  const { platformDomain = 'flowiq.in', serverIp = '139.99.47.143' } = useTenant();
 
   const handleCopy = (text, key) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2500);
   };
+
+  const publicIp = serverIp || '139.99.47.143';
+  const baseDomain = platformDomain || 'flowiq.in';
 
   return (
     <div style={{ maxWidth: '980px', margin: '0 auto' }}>
@@ -35,7 +40,7 @@ export default function DnsGuidePage() {
           How Domain Resolution Works in this Multi-Tenant Architecture
         </h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-          A common misconception is that DNS selects the tenant. In reality, <strong>DNS only directs the user's browser to your VPS IP address</strong>. The original domain name is sent in the HTTP request's <code>Host</code> header. Nginx preserves this header, and Django's <code>TenantMiddleware</code> matches it in the PostgreSQL database.
+          A common misconception is that DNS selects the tenant. In reality, <strong>DNS only directs the user's browser to your VPS IP address ({publicIp})</strong>. The original domain name is sent in the HTTP request's <code>Host</code> header. Nginx preserves this header, and Django's <code>AppTenantMiddleware</code> matches it in the PostgreSQL database.
         </p>
 
         <div style={{
@@ -49,21 +54,21 @@ export default function DnsGuidePage() {
           overflowX: 'auto',
           lineHeight: 1.7
         }}>
-          Browser Request (abc.company.com)<br />
+          Browser Request (tenant.{baseDomain} or customdomain.com)<br />
           &nbsp;&nbsp;↓<br />
-          DNS Resolver (Points to VPS Public IP)<br />
+          DNS Resolver (Points to VPS Public IP: {publicIp})<br />
           &nbsp;&nbsp;↓<br />
           Nginx Web Server (Listens on port 80/443)<br />
           &nbsp;&nbsp;↓ (Preserves: proxy_set_header Host $host)<br />
           Django REST Backend (Gunicorn 127.0.0.1:8000)<br />
           &nbsp;&nbsp;↓<br />
-          TenantMiddleware (Queries custom_domains table for "abc.company.com")<br />
+          TenantMiddleware (Queries domains table for incoming domain)<br />
           &nbsp;&nbsp;↓<br />
-          Attaches request.tenant = Tenant 101<br />
+          Attaches request.tenant = Tenant Organization<br />
           &nbsp;&nbsp;↓<br />
-          Database Queries (WHERE tenant_id = 101)<br />
+          PostgreSQL search_path set to "tenant_schema", "public"<br />
           &nbsp;&nbsp;↓<br />
-          React Frontend (Renders ABC branding & isolated data)
+          React Frontend (Renders tenant branding & isolated data)
         </div>
       </div>
 
@@ -76,7 +81,7 @@ export default function DnsGuidePage() {
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Platform Subdomains</h3>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem', lineHeight: 1.5 }}>
-            Tenants access your application via a subdomain under your SaaS platform (e.g. <code>acme.prod.com</code>).
+            Tenants access your application via a subdomain under your SaaS platform (e.g. <code>acme.{baseDomain}</code>).
           </p>
 
           <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.825rem', marginBottom: '1rem' }}>
@@ -87,11 +92,11 @@ export default function DnsGuidePage() {
               Add a wildcard DNS record in your platform's domain registrar:
             </div>
             <div className="mono" style={{ background: '#000', padding: '0.5rem', borderRadius: '4px', marginTop: '0.4rem', color: '#6EE7B7' }}>
-              Type: A | Host: * | Value: YOUR_VPS_IP
+              Type: A | Host: * | Value: {publicIp}
             </div>
           </div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Once this wildcard record exists, <strong>any</strong> new tenant subdomain (e.g. <code>xyz.prod.com</code>) works instantly without touching DNS again!
+            Once this wildcard record exists, <strong>any</strong> new tenant subdomain (e.g. <code>innoai.{baseDomain}</code>) works instantly without touching DNS again!
           </p>
         </div>
 
@@ -102,7 +107,7 @@ export default function DnsGuidePage() {
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Independent Custom Domains</h3>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem', lineHeight: 1.5 }}>
-            Enterprise clients who want their own brand (e.g. <code>notes.clientbrand.com</code> or <code>clientbrand.com</code>).
+            Enterprise clients who want their own brand (e.g. <code>notes.clientbrand.com</code> or <code>aquamind.in</code>).
           </p>
 
           <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.825rem', marginBottom: '1rem' }}>
@@ -110,14 +115,15 @@ export default function DnsGuidePage() {
               Client DNS Setup:
             </div>
             <div style={{ color: 'var(--text-secondary)' }}>
-              The client creates a CNAME pointing to your SaaS platform:
-            </div>
-            <div className="mono" style={{ background: '#000', padding: '0.5rem', borderRadius: '4px', marginTop: '0.4rem', color: '#6EE7B7' }}>
-              Type: CNAME | Host: notes | Value: prod.yourdomain.com
+              For Subdomains: Point CNAME to your SaaS platform cluster:<br />
+              <code>Type: CNAME | Host: notes | Value: {baseDomain}</code>
+              <br /><br />
+              For Apex Root Domains: Point A Record to your server IP:<br />
+              <code>Type: A | Host: @ | Value: {publicIp}</code>
             </div>
           </div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Nginx captures the incoming domain name and Django matches it in <code>custom_domains</code> automatically.
+            Nginx captures the incoming domain name and Django matches it in the <code>domains</code> table automatically.
           </p>
         </div>
       </div>
@@ -134,9 +140,7 @@ export default function DnsGuidePage() {
             <h4 style={{ color: '#F59E0B', fontWeight: 700, marginBottom: '0.5rem' }}>Cloudflare</h4>
             <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               <li>Navigate to your domain in the Cloudflare dashboard and click <strong>DNS</strong>.</li>
-              <li>Click <strong>Add Record</strong> and choose <code>CNAME</code>.</li>
-              <li>Enter your subdomain prefix (e.g. <code>notes</code>) in <strong>Name</strong>.</li>
-              <li>Enter your SaaS base domain (e.g. <code>prod.yourdomain.com</code>) in <strong>Target</strong>.</li>
+              <li>Click <strong>Add Record</strong> and choose <code>A</code> (Host: <code>@</code>, IP: <code>{publicIp}</code>) or <code>CNAME</code> (Host: <code>notes</code>, Target: <code>{baseDomain}</code>).</li>
               <li><strong>Crucial Step:</strong> Set Proxy Status to <strong>DNS Only</strong> (Grey cloud icon) so Let's Encrypt SSL certificates can be issued directly to your VPS.</li>
               <li>Click <strong>Save</strong>.</li>
             </ul>
@@ -148,9 +152,8 @@ export default function DnsGuidePage() {
             <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               <li>Go to <strong>Domain Portfolio</strong> &rarr; click your domain name.</li>
               <li>Select the <strong>DNS</strong> tab and click <strong>Add New Record</strong>.</li>
-              <li>Select Type: <code>CNAME</code>.</li>
-              <li>Name: Enter your subdomain (e.g. <code>notes</code> or <code>portal</code>).</li>
-              <li>Value: Enter your platform domain (e.g. <code>prod.yourdomain.com</code>).</li>
+              <li>For Root Apex Domain: Type: <code>A</code>, Name: <code>@</code>, Value: <code>{publicIp}</code>.</li>
+              <li>For Subdomain: Type: <code>CNAME</code>, Name: <code>notes</code>, Value: <code>{baseDomain}</code>.</li>
               <li>TTL: Select <strong>1/2 Hour</strong> and click <strong>Save</strong>.</li>
             </ul>
           </div>
@@ -161,8 +164,9 @@ export default function DnsGuidePage() {
             <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               <li>Open your <strong>Domain List</strong> and click <strong>Manage</strong> next to your domain.</li>
               <li>Click on the <strong>Advanced DNS</strong> tab.</li>
-              <li>Click <strong>Add New Record</strong> and choose <code>CNAME Record</code>.</li>
-              <li>Host: <code>notes</code> | Target: <code>prod.yourdomain.com</code>.</li>
+              <li>Click <strong>Add New Record</strong>.</li>
+              <li>For Root Apex Domain: Choose <code>A Record</code>, Host: <code>@</code>, Value: <code>{publicIp}</code>.</li>
+              <li>For Subdomain: Choose <code>CNAME Record</code>, Host: <code>notes</code>, Target: <code>{baseDomain}</code>.</li>
               <li>Click the green checkmark to save.</li>
             </ul>
           </div>
@@ -175,14 +179,14 @@ export default function DnsGuidePage() {
           Free Automatic SSL (HTTPS) with Let's Encrypt & Certbot
         </h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: 1.6 }}>
-          Once the client or tenant has pointed their DNS record to your server, generate a trusted TLS/SSL certificate directly on your VPS with Certbot:
+          Once the client or tenant has pointed their DNS record to your server, our platform automatically provisions a trusted Let's Encrypt TLS/SSL certificate in the background. You can also manually trigger an instant certificate renewal on your VPS:
         </p>
 
         <div style={{ background: '#030712', borderRadius: 'var(--radius-md)', padding: '1.25rem', border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700 }}>BASH COMMAND ON VPS:</span>
             <button
-              onClick={() => handleCopy('sudo certbot --nginx -d customdomain.com', 'certbot')}
+              onClick={() => handleCopy(`sudo certbot --nginx -d customdomain.com`, 'certbot')}
               className="btn btn-secondary btn-sm"
               style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
             >
@@ -191,7 +195,7 @@ export default function DnsGuidePage() {
             </button>
           </div>
           <pre className="mono" style={{ color: '#93C5FD', margin: 0, fontSize: '0.85rem' }}>
-            sudo certbot --nginx -d customdomain.com
+            {`sudo certbot --nginx -d customdomain.com`}
           </pre>
         </div>
 
@@ -210,7 +214,7 @@ export default function DnsGuidePage() {
         </div>
 
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.6, marginBottom: '1.25rem' }}>
-          A common security concern in multi-tenant SaaS architecture is: <em>"If an attacker or port scanner finds our server IP address, can they point a rogue domain to our server or scan our application directly?"</em>
+          A common security concern in multi-tenant SaaS architecture is: <em>"If an attacker or port scanner finds our server IP address ({publicIp}), can they point a rogue domain to our server or scan our application directly?"</em>
           <br /><br />
           Our platform implements a <strong>4-Layer Defense-in-Depth architecture</strong> that completely prevents unauthorized domain pointing, direct IP scans, and host header spoofing:
         </p>
@@ -232,7 +236,7 @@ export default function DnsGuidePage() {
               LAYER 2: DIRECT IP ACCESS DENIAL
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
-              Django's <code>TenantMiddleware</code> inspects every incoming <code>Host</code> header. If a visitor accesses the public IP directly, the middleware rejects the request with HTTP <code>403 DIRECT_IP_ACCESS_DENIED</code>.
+              Django's <code>AppTenantMiddleware</code> inspects every incoming <code>Host</code> header. If a visitor accesses the public IP directly, the middleware rejects the request with HTTP <code>403 DIRECT_IP_ACCESS_DENIED</code>.
             </p>
           </div>
 
@@ -242,7 +246,7 @@ export default function DnsGuidePage() {
               LAYER 3: DATABASE DOMAIN WHITELIST
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
-              If an attacker configures <code>evil-site.com &rarr; YOUR_IP</code>, Django performs a strict database lookup in <code>custom_domains</code>. Since the domain is unregistered, it is immediately blocked with HTTP 404/400.
+              If an attacker configures <code>evil-site.com &rarr; {publicIp}</code>, Django performs a strict database lookup in <code>domains</code>. Since the domain is unregistered, it is immediately blocked with HTTP 404/400.
             </p>
           </div>
 
@@ -255,15 +259,6 @@ export default function DnsGuidePage() {
               In production, placing Cloudflare in front of the platform hides your origin VPS IP from DNS lookups. Linux UFW firewall rules can be configured to only accept incoming traffic from Cloudflare proxy IPs.
             </p>
           </div>
-        </div>
-
-        <div style={{ background: 'rgba(0, 0, 0, 0.4)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-          <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '0.4rem' }}>
-            Verification in Test Suite:
-          </div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-            Automated test cases <code>test_direct_ip_access_blocked</code> and <code>test_unregistered_domain_blocked</code> continuously verify that direct IP and rogue domain pointing are 100% blocked.
-          </p>
         </div>
       </div>
     </div>

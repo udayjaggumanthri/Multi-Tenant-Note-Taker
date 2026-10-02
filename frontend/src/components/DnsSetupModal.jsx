@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { X, Copy, Check, Globe, HelpCircle, Server, ShieldCheck, ArrowRight, ExternalLink } from 'lucide-react';
+import { useTenant } from '../context/TenantContext';
 
 export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'company.com' }) {
   const [copiedKey, setCopiedKey] = useState(null);
-  const [activeTab, setActiveTab] = useState('records'); // 'records' | 'providers' | 'verify'
+  const [activeTab, setActiveTab] = useState('records'); // 'records' | 'providers' | 'verify' | 'security'
+
+  const { platformDomain = 'flowiq.in', serverIp = '139.99.47.143' } = useTenant();
 
   if (!isOpen) return null;
 
@@ -16,6 +19,8 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
   const domain = initialDomain || 'company.com';
   const isSubdomain = domain.split('.').length > 2;
   const hostLabel = isSubdomain ? domain.split('.')[0] : '@';
+  const cnameTarget = platformDomain || 'flowiq.in';
+  const publicIp = serverIp || '139.99.47.143';
 
   return (
     <div style={{
@@ -128,7 +133,7 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#60A5FA' }}>
-                  Option A: CNAME Record (Recommended for subdomains like notes.company.com)
+                  Option A: CNAME Record (Recommended for subdomains like notes.{domain})
                 </span>
                 <span className="badge badge-tenant">Subdomain Routing</span>
               </div>
@@ -147,11 +152,11 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
                     <tr>
                       <td className="mono" style={{ fontWeight: 700, color: '#38BDF8' }}>CNAME</td>
                       <td className="mono">{hostLabel}</td>
-                      <td className="mono">prod.yourdomain.com</td>
+                      <td className="mono">{cnameTarget}</td>
                       <td>Auto / 300s</td>
                       <td>
                         <button
-                          onClick={() => handleCopy('prod.yourdomain.com', 'cname')}
+                          onClick={() => handleCopy(cnameTarget, 'cname')}
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                         >
@@ -164,7 +169,7 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
                 </table>
               </div>
               <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
-                * Replace <code>prod.yourdomain.com</code> with your SaaS platform base domain.
+                * Points your subdomain to your SaaS platform cluster: <code>{cnameTarget}</code>.
               </div>
             </div>
 
@@ -172,7 +177,7 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#34D399' }}>
-                  Option B: A Record (Required for root apex domains like company.com)
+                  Option B: A Record (Required for root apex domains like {domain})
                 </span>
                 <span className="badge badge-active">Apex Routing</span>
               </div>
@@ -191,16 +196,16 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
                     <tr>
                       <td className="mono" style={{ fontWeight: 700, color: '#10B981' }}>A</td>
                       <td className="mono">@</td>
-                      <td className="mono">YOUR_VPS_PUBLIC_IP</td>
+                      <td className="mono">{publicIp}</td>
                       <td>Auto / 300s</td>
                       <td>
                         <button
-                          onClick={() => handleCopy('YOUR_VPS_PUBLIC_IP', 'a')}
+                          onClick={() => handleCopy(publicIp, 'a')}
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                         >
                           {copiedKey === 'a' ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
-                          {copiedKey === 'a' ? 'Copied' : 'Copy'}
+                          {copiedKey === 'a' ? 'Copied' : 'Copy IP'}
                         </button>
                       </td>
                     </tr>
@@ -208,7 +213,7 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
                 </table>
               </div>
               <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
-                * Replace <code>YOUR_VPS_PUBLIC_IP</code> with the public IPv4 address of your Linux server.
+                * Points your apex root domain directly to your platform VPS server IP: <code>{publicIp}</code>.
               </div>
             </div>
 
@@ -218,10 +223,10 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
                 How the Request Reaches the Tenant:
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                1. DNS points client traffic to your VPS IP.<br />
+                1. DNS points client traffic to your VPS IP: <code>{publicIp}</code>.<br />
                 2. Nginx accepts the connection and preserves <code>Host: {domain}</code>.<br />
-                3. Django's <code>TenantMiddleware</code> queries <code>custom_domains</code> for <code>{domain}</code>.<br />
-                4. The corresponding tenant is attached to <code>request.tenant</code> and their data is rendered.
+                3. Django's <code>AppTenantMiddleware</code> queries registered domains for <code>{domain}</code>.<br />
+                4. The corresponding tenant schema is activated and their isolated notes and branding are rendered.
               </div>
             </div>
           </div>
@@ -238,7 +243,7 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
               <ol style={{ paddingLeft: '1.25rem', fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <li>Log in to Cloudflare and select your domain.</li>
                 <li>Go to <strong>DNS &rarr; Records</strong> and click <strong>Add record</strong>.</li>
-                <li>Set <strong>Type</strong> to <code>CNAME</code> or <code>A</code>.</li>
+                <li>Set <strong>Type</strong> to <code>A</code> (Host: <code>@</code>, IPv4: <code>{publicIp}</code>) or <code>CNAME</code> (Host: <code>{hostLabel}</code>, Target: <code>{cnameTarget}</code>).</li>
                 <li>Set <strong>Proxy status</strong>: Toggle to <strong>DNS only (Grey cloud)</strong> during initial verification so Let's Encrypt / Certbot can issue the SSL certificate directly.</li>
                 <li>Click <strong>Save</strong>.</li>
               </ol>
@@ -252,7 +257,8 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
               <ol style={{ paddingLeft: '1.25rem', fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <li>Go to your <strong>Domain Portfolio</strong> &rarr; click your domain.</li>
                 <li>Select <strong>DNS</strong> tab and click <strong>Add New Record</strong>.</li>
-                <li>Type: <code>CNAME</code>, Name: <code>{hostLabel}</code>, Value: <code>prod.yourdomain.com</code>.</li>
+                <li>For Root Domain: Type <code>A</code>, Name <code>@</code>, Value <code>{publicIp}</code>.</li>
+                <li>For Subdomain: Type <code>CNAME</code>, Name <code>{hostLabel}</code>, Value <code>{cnameTarget}</code>.</li>
                 <li>TTL: <strong>1/2 Hour</strong> (or default). Click <strong>Save</strong>.</li>
               </ol>
             </div>
@@ -265,8 +271,9 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
               <ol style={{ paddingLeft: '1.25rem', fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <li>Go to <strong>Domain List</strong> &rarr; click <strong>Manage</strong>.</li>
                 <li>Open the <strong>Advanced DNS</strong> tab.</li>
-                <li>Click <strong>Add New Record</strong> &rarr; Choose <code>CNAME Record</code>.</li>
-                <li>Host: <code>{hostLabel}</code>, Target: <code>prod.yourdomain.com</code>.</li>
+                <li>Click <strong>Add New Record</strong>.</li>
+                <li>For Root Domain: Choose <code>A Record</code>, Host <code>@</code>, Value <code>{publicIp}</code>.</li>
+                <li>For Subdomain: Choose <code>CNAME Record</code>, Host <code>{hostLabel}</code>, Target <code>{cnameTarget}</code>.</li>
                 <li>Click the green checkmark to save.</li>
               </ol>
             </div>
@@ -280,7 +287,7 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
               How to Test DNS Propagation
             </h4>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              DNS records can take from 2 minutes to a few hours to propagate worldwide. You can test your configuration using standard command-line tools:
+              DNS records typically propagate within 2 to 15 minutes. You can verify your domain status using standard tools:
             </p>
 
             <div style={{ background: '#030712', borderRadius: 'var(--radius-md)', padding: '1rem', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
@@ -288,7 +295,7 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
                 TERMINAL / COMMAND PROMPT:
               </div>
               <pre className="mono" style={{ color: '#6EE7B7', fontSize: '0.825rem', overflowX: 'auto', margin: 0 }}>
-                {`# Test with nslookup\nnslookup ${domain}\n\n# Test with dig (macOS / Linux)\ndig +short ${domain}`}
+                {`# Test with nslookup\nnslookup ${domain}\n\n# Test with dig\ndig +short ${domain}`}
               </pre>
             </div>
 
@@ -296,7 +303,7 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
               Automatic HTTPS / SSL Provisioning
             </h4>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              Once DNS points to your server, issue a free Let's Encrypt SSL certificate on your VPS:
+              Our platform automatically detects newly registered domains and expands your Let's Encrypt SSL certificate in the background. You can also manually trigger an instant certificate renewal on your VPS:
             </p>
 
             <div style={{ background: '#030712', borderRadius: 'var(--radius-md)', padding: '1rem', border: '1px solid var(--border-color)' }}>
@@ -314,7 +321,7 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
               Host Protection & Direct IP Access Prevention
             </h4>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: 1.5 }}>
-              If an external party or internet scanner discovers your server's public IP address, our multi-tenant architecture protects your platform across 4 distinct layers:
+              If an external party or internet scanner discovers your server's public IP address ({publicIp}), our multi-tenant architecture protects your platform across 4 distinct layers:
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
@@ -328,14 +335,14 @@ export default function DnsSetupModal({ isOpen, onClose, initialDomain = 'compan
               <div style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
                 <strong style={{ color: '#34D399', fontSize: '0.85rem' }}>2. Django Direct IP Blocker:</strong>
                 <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Django <code>TenantMiddleware</code> inspects the <code>Host</code> header. Public IP addresses are strictly rejected with HTTP <code>403 DIRECT_IP_ACCESS_DENIED</code>.
+                  Django <code>AppTenantMiddleware</code> inspects the <code>Host</code> header. Public IP addresses are strictly rejected with HTTP <code>403 DIRECT_IP_ACCESS_DENIED</code>.
                 </p>
               </div>
 
               <div style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
                 <strong style={{ color: '#F59E0B', fontSize: '0.85rem' }}>3. Rogue Domain Pointing Prevention:</strong>
                 <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  If someone points their own unauthorized domain (e.g. <code>evil-site.com &rarr; YOUR_IP</code>), the database lookup fails and returns <code>404 TENANT_NOT_FOUND</code>.
+                  If someone points their own unauthorized domain (e.g. <code>evil-site.com &rarr; {publicIp}</code>), the database lookup fails and returns <code>404 TENANT_NOT_FOUND</code>.
                 </p>
               </div>
 

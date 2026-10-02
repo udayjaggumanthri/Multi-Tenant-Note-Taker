@@ -22,6 +22,7 @@ if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
     ALLOWED_HOSTS = ['*']
 
 PLATFORM_DOMAIN = os.getenv('PLATFORM_DOMAIN', 'prod.localhost').strip().lower()
+SERVER_PUBLIC_IP = os.getenv('SERVER_PUBLIC_IP', '139.99.47.143').strip()
 
 # ==============================================================================
 # DJANGO-TENANTS APPLICATION CONFIGURATION

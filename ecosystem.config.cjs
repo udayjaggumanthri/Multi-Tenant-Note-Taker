@@ -33,7 +33,7 @@ module.exports = {
       script: isWindows ? venvPython : venvGunicorn,
       args: isWindows
         ? 'manage.py runserver 0.0.0.0:8000'
-        : 'config.wsgi:application --bind 127.0.0.1:8000 --workers 3 --access-logfile - --error-logfile -',
+        : 'config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile - --error-logfile -',
       interpreter: 'none',
       env: {
         DJANGO_SETTINGS_MODULE: 'config.settings',
@@ -48,6 +48,19 @@ module.exports = {
       exec_mode: 'fork',
       out_file: path.join(__dirname, 'logs', 'pm2-backend-out.log'),
       error_file: path.join(__dirname, 'logs', 'pm2-backend-error.log'),
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    },
+    {
+      name: 'multitenant-frontend',
+      cwd: path.resolve(__dirname, 'frontend'),
+      script: 'npm',
+      args: 'run dev -- --host 0.0.0.0 --port 5173',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      time: true,
+      out_file: path.join(__dirname, 'logs', 'pm2-frontend-out.log'),
+      error_file: path.join(__dirname, 'logs', 'pm2-frontend-error.log'),
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     },
   ],

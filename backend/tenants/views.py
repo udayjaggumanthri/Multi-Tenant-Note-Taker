@@ -1,4 +1,5 @@
 from rest_framework import status, permissions, viewsets
+from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -24,12 +25,18 @@ class TenantPublicView(APIView):
 
     def get(self, request):
         tenant = getattr(request, 'tenant', None)
+        from django.conf import settings
+        platform_domain = getattr(settings, 'PLATFORM_DOMAIN', 'flowiq.in')
+        server_ip = getattr(settings, 'SERVER_PUBLIC_IP', '139.99.47.143')
+
         if not tenant or getattr(tenant, 'schema_name', '') == 'public':
             # Request is on the platform domain
             return Response({
                 'is_platform': True,
                 'name': 'Multi-Tenant Note Taker SaaS Platform',
-                'domain': getattr(request, 'normalized_host', 'localhost')
+                'domain': getattr(request, 'normalized_host', 'localhost'),
+                'platform_domain': platform_domain,
+                'server_ip': server_ip
             })
 
         # Return tenant public details and branding settings
@@ -47,6 +54,8 @@ class TenantPublicView(APIView):
             'schema_name': tenant.schema_name,
             'status': tenant.status,
             'domain': primary_domain.domain if primary_domain else '',
+            'platform_domain': platform_domain,
+            'server_ip': server_ip,
             'website_settings': settings_data
         })
 
@@ -100,6 +109,11 @@ class PlatformAdminTenantViewSet(viewsets.ModelViewSet):
         serializer = CreateTenantSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         tenant = serializer.save()
+
+        # Auto-provision SSL certificate for new tenant domain in background
+        from tenants.ssl_utils import trigger_ssl_provisioning
+        trigger_ssl_provisioning()
+
         output_serializer = TenantSerializer(tenant)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
@@ -113,6 +127,39 @@ class PlatformAdminTenantViewSet(viewsets.ModelViewSet):
             instance.name = name_val
         instance.save()
         return Response(TenantSerializer(instance).data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        schema_name = instance.schema_name
+        tenant_name = instance.name
+
+        try:
+            # 1. Cleanly delete tenant users in public schema
+            from users.models import User
+            User.objects.filter(tenant=instance).delete()
+
+            # 2. Delete tenant client and drop its isolated PostgreSQL schema
+            instance.delete(force_drop=True)
+
+            # 3. Synchronize Nginx configuration in the background
+            from tenants.ssl_utils import trigger_ssl_provisioning
+            trigger_ssl_provisioning()
+
+            return Response({
+                'message': f"Tenant '{tenant_name}' ({schema_name}) deleted successfully."
+            }, status=status.HTTP_200_OK)
+        except Exception as exc:
+            import logging
+            logging.getLogger('tenant').error(f"Error deleting tenant {instance.id}: {exc}")
+            return Response({
+                'error': f"Failed to delete tenant: {str(exc)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='sync-ssl')
+    def sync_ssl(self, request):
+        from tenants.ssl_utils import trigger_ssl_provisioning
+        trigger_ssl_provisioning()
+        return Response({'message': 'SSL certificates and Nginx routing synchronization initiated in background.'})
 
 
 class PlatformAdminStatsView(APIView):
@@ -174,6 +221,11 @@ class VerifyDomainView(APIView):
             resolved_ip = socket.gethostbyname(domain_name)
             domain_obj.is_verified = True
             domain_obj.save()
+
+            # Auto-provision SSL certificate for newly verified domain in background
+            from tenants.ssl_utils import trigger_ssl_provisioning
+            trigger_ssl_provisioning()
+
             return Response({
                 'verified': True,
                 'domain': domain_name,
