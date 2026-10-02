@@ -6,6 +6,7 @@ const TenantContext = createContext(null);
 export function TenantProvider({ children }) {
   const [tenant, setTenant] = useState(null);
   const [isPlatform, setIsPlatform] = useState(false);
+  const [platformInfo, setPlatformInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -23,9 +24,14 @@ export function TenantProvider({ children }) {
       if (data.is_platform) {
         setIsPlatform(true);
         setTenant(null);
+        setPlatformInfo(data);
       } else {
         setIsPlatform(false);
         setTenant(data);
+        setPlatformInfo({
+          platform_domain: data.platform_domain,
+          platform_base_domain: data.platform_base_domain,
+        });
 
         // Apply tenant primary branding color dynamically
         if (data.website_settings && data.website_settings.primary_color) {
@@ -52,6 +58,7 @@ export function TenantProvider({ children }) {
     <TenantContext.Provider value={{
       tenant,
       isPlatform,
+      platformInfo,
       loading,
       error,
       reloadTenant: fetchTenant,

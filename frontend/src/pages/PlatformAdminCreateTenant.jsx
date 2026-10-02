@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { ArrowLeft, Plus, Building2, User, Globe, Database, Shield, Info, Check } from 'lucide-react';
+import { useTenant } from '../context/TenantContext';
+import { ArrowLeft, Plus, Building2, User, Globe, Database, Shield, Info, Check, Sparkles } from 'lucide-react';
 import DnsSetupModal from '../components/DnsSetupModal';
 
 export default function PlatformAdminCreateTenant() {
   const navigate = useNavigate();
+  const { platformInfo } = useTenant();
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -18,6 +20,39 @@ export default function PlatformAdminCreateTenant() {
   const [customDomainInput, setCustomDomainInput] = useState('');
   const [isDnsModalOpen, setIsDnsModalOpen] = useState(false);
   
+  // Auto-detect candidate base domains (browser host, backend setting, flowiq.in, localhost)
+  const detectedApexDomain = (() => {
+    const host = window.location.hostname.toLowerCase();
+    if (host.includes('localhost') || host === '127.0.0.1' || host.includes('ngrok')) {
+      return null;
+    }
+    return host.replace(/^(prod|app|admin|platform|api)\./i, '');
+  })();
+
+  const candidateBaseDomains = Array.from(new Set([
+    platformInfo?.platform_base_domain,
+    detectedApexDomain,
+    'flowiq.in',
+    'localhost'
+  ].filter(d => Boolean(d && typeof d === 'string' && d.trim() !== ''))));
+
+  // Base domain state (defaults to production apex domain e.g. flowiq.in or detected apex)
+  const [baseDomain, setBaseDomain] = useState(() => {
+    if (detectedApexDomain) return detectedApexDomain;
+    if (platformInfo?.platform_base_domain && platformInfo.platform_base_domain !== 'localhost') {
+      return platformInfo.platform_base_domain;
+    }
+    return 'flowiq.in';
+  });
+
+  useEffect(() => {
+    if (platformInfo?.platform_base_domain && platformInfo.platform_base_domain !== 'localhost') {
+      setBaseDomain(platformInfo.platform_base_domain);
+    } else if (detectedApexDomain) {
+      setBaseDomain(detectedApexDomain);
+    }
+  }, [platformInfo, detectedApexDomain]);
+
   // Database Strategy: ISOLATED_SCHEMA (django-tenants default)
   const [dbStrategy, setDbStrategy] = useState('ISOLATED_SCHEMA');
   
@@ -25,19 +60,24 @@ export default function PlatformAdminCreateTenant() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  // Derive subdomain automatically from slug without fake prod.com
-  const getPlatformBaseDomain = () => {
-    const host = window.location.hostname.toLowerCase();
-    if (host.includes('localhost') || host.includes('ngrok') || host === '127.0.0.1') {
-      return 'localhost';
-    }
-    // Real production domain (strip 'prod.' prefix if present)
-    return host.replace(/^prod\./i, '');
-  };
+  // Sanitized domain calculation
+  const cleanSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '');
+  const cleanBaseDomain = baseDomain
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//i, '')
+    .replace(/:\d+$/, '')
+    .replace(/^\.+|\.+$/g, '');
 
-  const platformBaseDomain = getPlatformBaseDomain();
-  const autoSubdomain = slug ? `${slug}.${platformBaseDomain}` : '';
-  const finalDomain = domainMode === 'SUBDOMAIN' ? autoSubdomain : customDomainInput.trim().toLowerCase();
+  const autoSubdomain = cleanSlug && cleanBaseDomain ? `${cleanSlug}.${cleanBaseDomain}` : '';
+  const cleanCustomDomain = customDomainInput
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//i, '')
+    .replace(/:\d+$/, '')
+    .replace(/^\.+|\.+$/g, '');
+
+  const finalDomain = domainMode === 'SUBDOMAIN' ? autoSubdomain : cleanCustomDomain;
 
   const handleNameChange = (val) => {
     setName(val);
@@ -54,16 +94,34 @@ export default function PlatformAdminCreateTenant() {
     setSaving(true);
     setError(null);
 
-    if (domainMode === 'CUSTOM' && !customDomainInput.trim()) {
-      setError('Please provide a valid custom domain (e.g. company.com).');
-      setSaving(false);
-      return;
+    if (domainMode === 'SUBDOMAIN') {
+      if (!cleanSlug) {
+        setError('Please provide a valid tenant slug (alphanumeric and dashes only).');
+        setSaving(false);
+        return;
+      }
+      if (!cleanBaseDomain) {
+        setError('Please specify a platform base domain (e.g. flowiq.in or localhost).');
+        setSaving(false);
+        return;
+      }
+      if (cleanBaseDomain.includes('ngrok')) {
+        setError('Multi-level subdomains on free ngrok tunnels are blocked by SSL (NET::ERR_CERT_COMMON_NAME_INVALID). Please use your production domain (e.g. flowiq.in) or localhost.');
+        setSaving(false);
+        return;
+      }
+    } else if (domainMode === 'CUSTOM') {
+      if (!cleanCustomDomain) {
+        setError('Please provide a valid custom domain (e.g. company.com).');
+        setSaving(false);
+        return;
+      }
     }
 
     try {
       await api.createAdminTenant({
         name,
-        slug,
+        slug: cleanSlug,
         admin_name: adminName,
         admin_email: adminEmail,
         admin_password: adminPassword,
@@ -141,6 +199,26 @@ export default function PlatformAdminCreateTenant() {
               Select whether this tenant accesses the platform through a managed platform subdomain or their own branded apex domain.
             </p>
 
+            {window.location.hostname.includes('ngrok') && (
+              <div style={{
+                padding: '0.75rem 1rem',
+                background: 'rgba(234, 179, 8, 0.1)',
+                border: '1px solid rgba(234, 179, 8, 0.3)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.6rem',
+                fontSize: '0.8rem',
+                color: '#FDE047'
+              }}>
+                <Info size={16} style={{ flexShrink: 0, marginTop: '2px', color: '#FACC15' }} />
+                <div style={{ lineHeight: 1.45 }}>
+                  <strong>Testing on ngrok:</strong> Free ngrok certificates only cover single-level tunnels (<code>*.ngrok-free.dev</code>). Multi-level subdomains (e.g. <code>hi.{window.location.hostname}</code>) will trigger browser SSL errors (<code>NET::ERR_CERT_COMMON_NAME_INVALID</code>). Please select your production domain (e.g. <code>flowiq.in</code>) or <code>localhost</code> for local development.
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
               {/* Option A: Platform Subdomain */}
               <div
@@ -186,13 +264,91 @@ export default function PlatformAdminCreateTenant() {
             </div>
 
             {domainMode === 'SUBDOMAIN' ? (
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Auto-Generated Subdomain</label>
-                <div className="form-control mono" style={{ background: 'rgba(0, 0, 0, 0.3)', color: '#60A5FA' }}>
-                  {autoSubdomain || 'e.g. acme.localhost'}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1.2fr) auto minmax(180px, 2fr)', alignItems: 'center', gap: '0.6rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem' }}>Subdomain Prefix</label>
+                    <input
+                      type="text"
+                      required
+                      className="form-control mono"
+                      placeholder="e.g. acme"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ''))}
+                    />
+                  </div>
+
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-muted)', paddingTop: '1.25rem', userSelect: 'none' }}>
+                    .
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Base Apex Domain</span>
+                      <span style={{ fontSize: '0.72rem', color: '#60A5FA' }}>Production Domain</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="form-control mono"
+                      placeholder="e.g. flowiq.in or localhost"
+                      value={baseDomain}
+                      onChange={(e) => setBaseDomain(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-                  Traffic arrives at Nginx, which matches this hostname and attaches the tenant.
+
+                {/* Quick Selection Suggestions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Quick Select Base Domain:</span>
+                  {candidateBaseDomains.map((cand) => (
+                    <button
+                      key={cand}
+                      type="button"
+                      onClick={() => setBaseDomain(cand)}
+                      style={{
+                        padding: '0.2rem 0.65rem',
+                        fontSize: '0.75rem',
+                        borderRadius: 'var(--radius-full)',
+                        background: baseDomain === cand ? 'rgba(37, 99, 235, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                        border: `1px solid ${baseDomain === cand ? '#60A5FA' : 'var(--border-color)'}`,
+                        color: baseDomain === cand ? '#93C5FD' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {cand === 'localhost' ? '💻 localhost (Local Dev)' : `🌐 ${cand} (Production)`}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Live Preview Box */}
+                <div style={{
+                  padding: '0.85rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'rgba(0, 0, 0, 0.35)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                      Resolved Access Domain
+                    </div>
+                    <div className="mono" style={{ color: '#60A5FA', fontSize: '0.95rem', fontWeight: 700 }}>
+                      {finalDomain ? (baseDomain === 'localhost' ? `http://${finalDomain}:5173` : `https://${finalDomain}`) : 'e.g. acme.flowiq.in'}
+                    </div>
+                  </div>
+                  <span className="badge" style={{ background: 'rgba(37, 99, 235, 0.15)', color: '#93C5FD', border: '1px solid rgba(37, 99, 235, 0.3)' }}>
+                    ✓ Auto-Managed Subdomain
+                  </span>
+                </div>
+
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  Incoming requests to <code>{finalDomain || '*.yourdomain.com'}</code> are routed via Nginx directly into this tenant's dedicated PostgreSQL schema.
                 </div>
               </div>
             ) : (
